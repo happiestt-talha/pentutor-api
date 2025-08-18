@@ -1,0 +1,367 @@
+{
+	"info": {
+		"_postman_id": "notification-system-lms",
+		"name": "LMS Notification System",
+		"description": "Complete API collection for testing the LMS notification system",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{jwt_token}}",
+				"type": "string"
+			}
+		]
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8000",
+			"type": "string"
+		},
+		{
+			"key": "jwt_token",
+			"value": "YOUR_JWT_TOKEN_HERE",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "Get All Notifications",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/api/notifications/",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"notifications",
+						""
+					]
+				},
+				"description": "Get paginated list of all notifications for the logged-in user"
+			}
+		},
+		{
+			"name": "Get Unread Notifications",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/api/notifications/?is_read=false",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"notifications",
+						""
+					],
+					"query": [
+						{
+							"key": "is_read",
+							"value": "false"
+						}
+					]
+				},
+				"description": "Get only unread notifications"
+			}
+		},
+		{
+			"name": "Get Video Upload Notifications",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/api/notifications/?notification_type=video_upload",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"notifications",
+						""
+					],
+					"query": [
+						{
+							"key": "notification_type",
+							"value": "video_upload"
+						}
+					]
+				},
+				"description": "Get only video upload notifications"
+			}
+		},
+		{
+			"name": "Get Notification Details",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/api/notifications/1/",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"notifications",
+						"1",
+						""
+					]
+				},
+				"description": "Get detailed information about a specific notification (automatically marks as read)"
+			}
+		},
+		{
+			"name": "Mark Notifications as Read",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"notification_ids\": [1, 2, 3]\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/notifications/mark-as-read/",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"notifications",
+						"mark-as-read",
+						""
+					]
+				},
+				"description": "Mark specific notifications as read"
+			}
+		},
+		{
+			"name": "Mark All Notifications as Read",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/api/notifications/mark-all-as-read/",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"notifications",
+						"mark-all-as-read",
+						""
+					]
+				},
+				"description": "Mark all unread notifications as read for the current user"
+			}
+		},
+		{
+			"name": "Get Notification Statistics",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/api/notifications/stats/",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"notifications",
+						"stats",
+						""
+					]
+				},
+				"description": "Get notification statistics for the current user"
+			}
+		},
+		{
+			"name": "Get Unread Count",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/api/notifications/unread-count/",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"notifications",
+						"unread-count",
+						""
+					]
+				},
+				"description": "Get the count of unread notifications (useful for badges)"
+			}
+		},
+		{
+			"name": "Get Recent Notifications",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/api/notifications/recent/",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"notifications",
+						"recent",
+						""
+					]
+				},
+				"description": "Get the 10 most recent notifications (useful for dropdown menus)"
+			}
+		},
+		{
+			"name": "Delete Notification",
+			"request": {
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/api/notifications/1/delete/",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"notifications",
+						"1",
+						"delete",
+						""
+					]
+				},
+				"description": "Delete a specific notification"
+			}
+		},
+		{
+			"name": "Delete All Read Notifications",
+			"request": {
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/api/notifications/delete-all-read/",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"notifications",
+						"delete-all-read",
+						""
+					]
+				},
+				"description": "Delete all read notifications for the current user"
+			}
+		},
+		{
+			"name": "Paginated Notifications",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/api/notifications/?page=1&page_size=10",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"notifications",
+						""
+					],
+					"query": [
+						{
+							"key": "page",
+							"value": "1"
+						},
+						{
+							"key": "page_size",
+							"value": "10"
+						}
+					]
+				},
+				"description": "Get notifications with custom pagination"
+			}
+		}
+	]
+}

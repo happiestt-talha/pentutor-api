@@ -1,0 +1,334 @@
+{
+  "info": {
+    "name": "LMS Project API Spec",
+    "version": "v1",
+    "description": "Consolidated API reference for Authentication, Courses, Students, Teachers, Meetings, Payments, Notifications, Alerts, Email Automation, Feedback, Chat, Calendar Sync, and HR/Job Portal."
+  },
+  "servers": [
+    { "url": "http://localhost:8000", "description": "Local" }
+  ],
+  "endpoints": [
+    {
+      "tag": "auth",
+      "items": [
+        {
+          "name": "Register",
+          "method": "POST",
+          "path": "/api/auth/register/",
+          "request": {
+            "body": {
+              "username": "string",
+              "email": "string",
+              "password": "string",
+              "password_confirm": "string",
+              "first_name": "string",
+              "last_name": "string",
+              "role": "student | teacher | admin | subadmin",
+              "age": "number",
+              "city": "string",
+              "country": "string",
+              "gender": "string"
+            }
+          },
+          "responses": {
+            "201": {
+              "success": true,
+              "message": "Registration successful! Please check your email for verification.",
+              "data": { "user_id": "uuid", "email": "string", "username": "string" }
+            },
+            "400": {
+              "success": false,
+              "message": "Registration failed",
+              "errors": "serializer errors"
+            }
+          }
+        },
+        {
+          "name": "Verify Email",
+          "method": "GET",
+          "path": "/api/auth/verify-email/{token}/",
+          "path_params": { "token": "string" },
+          "responses": {
+            "200": { "success": true, "message": "Email verified successfully! You can now login." },
+            "400": { "success": false, "message": "Invalid or expired verification token." }
+          }
+        },
+        {
+          "name": "Resend Verification Email",
+          "method": "POST",
+          "path": "/api/auth/resend-verification/",
+          "request": { "body": { "email": "string" } },
+          "responses": {
+            "200": { "success": true, "message": "Verification email sent successfully" },
+            "400": { "success": false, "message": "Email is already verified | Email is required" },
+            "404": { "success": false, "message": "User not found" }
+          }
+        },
+        {
+          "name": "Login",
+          "method": "POST",
+          "path": "/api/auth/login/",
+          "request": { "body": { "email": "string", "password": "string" } },
+          "responses": {
+            "200": {
+              "success": true,
+              "message": "Login successful",
+              "data": {
+                "access_token": "string",
+                "refresh_token": "string",
+                "user": {
+                  "id": "uuid",
+                  "username": "string",
+                  "email": "string",
+                  "first_name": "string",
+                  "last_name": "string",
+                  "role": "string",
+                  "age": "number",
+                  "gender": "string",
+                  "city": "string",
+                  "country": "string",
+                  "is_verified": true,
+                  "created_at": "datetime"
+                }
+              }
+            },
+            "400": { "success": false, "message": "Login failed", "errors": "Invalid credentials or not verified" }
+          }
+        },
+        {
+          "name": "Profile - Get",
+          "method": "GET",
+          "path": "/api/auth/profile/",
+          "auth": "Bearer",
+          "responses": { "200": { "success": true, "data": "UserSerializer" } }
+        },
+        {
+          "name": "Profile - Update",
+          "method": "PUT",
+          "path": "/api/auth/profile/",
+          "auth": "Bearer",
+          "request": { "body": { "username": "string?", "first_name": "string?", "last_name": "string?", "age": "number?", "gender": "string?", "city": "string?", "country": "string?" } },
+          "responses": {
+            "200": { "success": true, "message": "Profile updated successfully", "data": "UserSerializer" },
+            "400": { "success": false, "message": "Profile update failed", "errors": "serializer errors" }
+          }
+        },
+        {
+          "name": "Logout",
+          "method": "POST",
+          "path": "/api/auth/logout/",
+          "auth": "Bearer",
+          "request": { "body": { "refresh_token": "string?" } },
+          "responses": {
+            "200": { "success": true, "message": "Logout successful" },
+            "400": { "success": false, "message": "Logout failed" }
+          }
+        },
+        {
+          "name": "Admin - Users List",
+          "method": "GET",
+          "path": "/api/auth/admin/users/",
+          "auth": "Bearer",
+          "query": { "role": "student|teacher|admin|subadmin?", "is_verified": "true|false?" },
+          "responses": { "200": { "success": true, "data": ["UserSerializer"] }, "403": { "success": false, "message": "Access denied" } }
+        },
+        {
+          "name": "Admin - Update User Role",
+          "method": "PUT",
+          "path": "/api/auth/admin/users/{user_id}/role/",
+          "auth": "Bearer",
+          "path_params": { "user_id": "uuid" },
+          "request": { "body": { "role": "student|teacher|admin|subadmin" } },
+          "responses": { "200": { "success": true, "message": "User role updated successfully", "data": "UserSerializer" }, "403": { "success": false } }
+        }
+      ]
+    },
+
+    {
+      "tag": "payments",
+      "items": [
+        {
+          "name": "Initiate JazzCash",
+          "method": "POST",
+          "path": "/api/payments/jazzcash/initiate/",
+          "auth": "Bearer",
+          "request": { "body": { "course_id": "uuid", "amount": "number" } },
+          "responses": { "200": { "payment_url": "string" } }
+        },
+        {
+          "name": "Verify JazzCash",
+          "method": "GET",
+          "path": "/api/payments/jazzcash/verify/",
+          "query": { "pp_TxnRefNo": "string", "pp_ResponseCode": "string" },
+          "responses": { "200": { "status": "success|failed" }, "404": { "error": "Transaction not found" } }
+        },
+        {
+          "name": "Initiate EasyPaisa",
+          "method": "POST",
+          "path": "/api/payments/easypaisa/initiate/",
+          "auth": "Bearer",
+          "request": { "body": { "course_id": "uuid", "amount": "number" } },
+          "responses": { "200": { "payment_url": "string" } }
+        },
+        {
+          "name": "Verify EasyPaisa",
+          "method": "GET",
+          "path": "/api/payments/easypaisa/verify/",
+          "query": { "orderRefNum": "string", "paymentStatus": "SUCCESS|..." },
+          "responses": { "200": { "status": "success|failed" }, "404": { "error": "Transaction not found" } }
+        }
+      ]
+    },
+
+    {
+      "tag": "courses",
+      "items": [
+        {
+          "name": "Course List",
+          "method": "GET",
+          "path": "/api/courses/",
+          "query": { "q": "string?", "min_price": "number?", "max_price": "number?", "featured": "true|false?", "ordering": "created_at|-created_at|price|..." },
+          "responses": { "200": ["CourseListSerializer"] }
+        },
+        { "name": "Course Detail", "method": "GET", "path": "/api/courses/{course_id}/", "path_params": { "course_id": "int" }, "responses": { "200": "CourseDetailSerializer", "404": { "error": "Course not found" } } },
+        { "name": "Course Videos", "method": "GET", "path": "/api/courses/{course_id}/videos/", "path_params": { "course_id": "int" }, "responses": { "200": { "course_id": "int", "course_title": "string", "videos": [ { "id": 1, "title": "string", "duration": "string", "order": 1, "has_quiz": false, "has_assignment": false } ] } } },
+        { "name": "Video Detail", "method": "GET", "path": "/api/courses/videos/{video_id}/", "path_params": { "video_id": "int" }, "responses": { "200": "VideoDetailSerializer", "404": { "error": "Video not found" } } },
+        { "name": "Video Quizzes & Assignments", "method": "GET", "path": "/api/courses/videos/{video_id}/quiz-assignments/", "path_params": { "video_id": "int" }, "responses": { "200": { "video_id": "int", "video_title": "string", "quizzes": ["QuizSerializer"], "assignments": ["AssignmentSerializer"] } } }
+      ]
+    },
+
+    {
+      "tag": "students",
+      "items": [
+        { "name": "Student Dashboard", "method": "GET", "path": "/api/students/", "auth": "Bearer", "responses": { "200": { "success": true, "data": { "statistics": {}, "recent_enrollments": [], "available_courses": ["CourseListSerializer"] } } } },
+        { "name": "My Courses", "method": "GET", "path": "/api/students/courses/", "auth": "Bearer", "responses": { "200": { "success": true, "data": { "total_enrolled": 0, "courses": [] } } } },
+        { "name": "Available Courses", "method": "GET", "path": "/api/students/courses/available/", "auth": "Bearer" },
+        { "name": "Enroll in Course", "method": "POST", "path": "/api/students/courses/{course_id}/enroll/", "auth": "Bearer", "path_params": { "course_id": "int" }, "responses": { "201": { "success": true, "message": "Successfully enrolled in course", "data": { "enrollment_id": "int", "course_title": "string", "enrolled_at": "datetime" } }, "400": { "success": false, "message": "Payment required | Already enrolled" }, "404": { "success": false, "message": "Course not found" } } },
+        { "name": "Course Progress", "method": "GET", "path": "/api/students/courses/{course_id}/progress/", "auth": "Bearer", "path_params": { "course_id": "int" } },
+        { "name": "Mark Video Completed", "method": "POST", "path": "/api/students/videos/{video_id}/complete/", "auth": "Bearer", "path_params": { "video_id": "int" } },
+        { "name": "Mark Quiz Completed", "method": "POST", "path": "/api/students/quizzes/{quiz_id}/complete/", "auth": "Bearer", "path_params": { "quiz_id": "int" } },
+        { "name": "Payment History", "method": "GET", "path": "/api/students/payments/", "auth": "Bearer" }
+      ]
+    },
+
+    {
+      "tag": "teachers",
+      "items": [
+        { "name": "Teacher Dashboard", "method": "GET", "path": "/api/teacher/", "auth": "Bearer" },
+        { "name": "Teacher Courses (List/Create)", "method": "GET|POST", "path": "/api/teacher/courses/", "auth": "Bearer", "request(POST)": { "body": { "title": "string", "description": "string", "price": "number", "course_type": "free|paid", "thumbnail": "file?", "is_active": "boolean?" } } },
+        { "name": "Teacher Course Detail (Get/Update/Delete)", "method": "GET|PUT|DELETE", "path": "/api/teacher/courses/{course_id}/", "auth": "Bearer" },
+        { "name": "Course Videos (List/Create)", "method": "GET|POST", "path": "/api/teacher/courses/{course_id}/videos/", "auth": "Bearer", "request(POST)": { "body": { "title": "string", "description": "string", "video_file": "file", "duration": "string", "order": "int" } } },
+        { "name": "Video Detail (Get/Update/Delete)", "method": "GET|PUT|DELETE", "path": "/api/teacher/videos/{video_id}/", "auth": "Bearer" },
+        { "name": "Course Quizzes (List/Create)", "method": "GET|POST", "path": "/api/teacher/courses/{course_id}/quizzes/", "auth": "Bearer", "request(POST)": { "body": { "title": "string", "description": "string", "passing_score": "int", "order": "int", "video": "int", "questions": [ { "question": "string", "options": ["A","B","C","D"], "correct_answer": "string", "explanation": "string" } ] } } },
+        { "name": "Quiz Detail (Get/Update/Delete)", "method": "GET|PUT|DELETE", "path": "/api/teacher/quizzes/{quiz_id}/", "auth": "Bearer" },
+        { "name": "Course Students", "method": "GET", "path": "/api/teacher/courses/{course_id}/students/", "auth": "Bearer" },
+        { "name": "Course Live Classes (List/Schedule)", "method": "GET|POST", "path": "/api/teacher/courses/{course_id}/live-classes/", "auth": "Bearer", "request(POST)": { "body": { "title": "string?", "scheduled_time": "YYYY-MM-DDTHH:MM[:SS]", "max_participants": 100, "is_recorded": false, "waiting_room": true } } },
+        { "name": "Live Class Detail", "method": "GET", "path": "/api/teacher/live-classes/{class_id}/", "auth": "Bearer" }
+      ]
+    },
+
+    {
+      "tag": "meetings",
+      "items": [
+        { "name": "Create Meeting", "method": "POST", "path": "/api/meetings/create/", "auth": "Bearer", "request": { "body": { "title": "string", "meeting_type": "instant|scheduled|lecture", "access_type": "public|private|approval_required", "course_id": "uuid? (required when lecture)", "scheduled_time": "datetime? (required when scheduled)", "max_participants": 100, "waiting_room": false, "allow_unmute": true, "allow_screen_share": true, "enable_chat": true, "enable_reactions": true, "is_recorded": false, "password": "string?", "is_password_required": false, "invites": ["email1@example.com"] } }, "responses": { "201": { "meeting_id": "uuid", "password": "string|null", "join_url": "/meeting/join/{id}", "status": "created", "meeting": "MeetingSerializer", "participant": "ParticipantSerializer" } } },
+        { "name": "Join Meeting", "method": "POST", "path": "/api/meetings/join/{meeting_id}/", "auth": "Bearer|Optional", "path_params": { "meeting_id": "string" }, "request": { "body": { "password": "string?" } }, "responses": { "200": { "participant": "ParticipantSerializer", "meeting": "MeetingSerializer" }, "400": { "error": "..." }, "401": { "error": "This meeting requires a password" }, "403": { "error": "Access denied" } } },
+        { "name": "Leave Meeting", "method": "POST", "path": "/api/meetings/leave/{meeting_id}/", "auth": "Bearer", "path_params": { "meeting_id": "string" } },
+        { "name": "End Meeting", "method": "POST", "path": "/api/meetings/end/{meeting_id}/", "auth": "Bearer", "path_params": { "meeting_id": "string" } },
+        { "name": "Meeting Participants", "method": "GET", "path": "/api/meetings/{meeting_id}/participants/", "auth": "Bearer", "path_params": { "meeting_id": "string" } }
+      ]
+    },
+
+    {
+      "tag": "notifications",
+      "items": [
+        { "name": "List Notifications", "method": "GET", "path": "/api/notifications/", "auth": "Bearer", "query": { "is_read": "true|false?", "notification_type": "string?", "page": 1, "page_size": 20 } },
+        { "name": "Notification Detail (auto-mark read)", "method": "GET", "path": "/api/notifications/{id}/", "auth": "Bearer" },
+        { "name": "Mark Notifications as Read", "method": "POST", "path": "/api/notifications/mark-as-read/", "auth": "Bearer", "request": { "body": { "notification_ids": [1,2,3] } } },
+        { "name": "Mark All as Read", "method": "POST", "path": "/api/notifications/mark-all-as-read/", "auth": "Bearer" },
+        { "name": "Stats", "method": "GET", "path": "/api/notifications/stats/", "auth": "Bearer" },
+        { "name": "Delete Notification", "method": "DELETE", "path": "/api/notifications/{notification_id}/delete/", "auth": "Bearer" },
+        { "name": "Delete All Read", "method": "DELETE", "path": "/api/notifications/delete-all-read/", "auth": "Bearer" },
+        { "name": "Unread Count", "method": "GET", "path": "/api/notifications/unread-count/", "auth": "Bearer" },
+        { "name": "Recent 10", "method": "GET", "path": "/api/notifications/recent/", "auth": "Bearer" }
+      ]
+    },
+
+    {
+      "tag": "alerts",
+      "items": [
+        { "name": "User Alerts", "method": "GET", "path": "/api/alerts/", "auth": "Bearer" },
+        { "name": "Heartbeat", "method": "POST", "path": "/api/alerts/heartbeat/", "auth": "Bearer", "request": { "body": { "meeting_id": "string" } } }
+      ]
+    },
+
+    {
+      "tag": "feedback",
+      "items": [
+        { "name": "Support Tickets (List/Create)", "method": "GET|POST", "path": "/api/feedback/tickets/", "auth": "Bearer", "request(POST)": { "body": { "subject": "string", "message": "string", "priority": "low|medium|high" } } },
+        { "name": "Support Ticket Detail", "method": "GET", "path": "/api/feedback/tickets/{id}/", "auth": "Bearer" },
+        { "name": "Add Ticket Reply", "method": "POST", "path": "/api/feedback/tickets/{ticket_id}/reply/", "auth": "Bearer", "request": { "body": { "message": "string" } } },
+        { "name": "Course Feedback (List/Create)", "method": "GET|POST", "path": "/api/feedback/course-feedback/", "auth": "Bearer", "request(POST)": { "body": { "course_name": "string", "rating": 5, "feedback_text": "string" } } },
+        { "name": "Teacher Feedback (List/Create)", "method": "GET|POST", "path": "/api/feedback/teacher-feedback/", "auth": "Bearer", "request(POST)": { "body": { "teacher_name": "string", "rating": 5, "feedback_text": "string" } } }
+      ]
+    },
+
+    {
+      "tag": "chat",
+      "items": [
+        { "name": "Chatbot", "method": "POST", "path": "/api/chat/chatbot/", "auth": "Bearer", "request": { "body": { "message": "string" } } },
+        { "name": "Chat History", "method": "GET", "path": "/api/chat/{room_id}/", "auth": "Bearer", "query": { "page": 1, "limit": 20 } }
+      ]
+    },
+
+    {
+      "tag": "email_automation",
+      "items": [
+        { "name": "Test Enrollment Email", "method": "POST", "path": "/api/email-automation/test_enrollment_email/", "auth": "Bearer (Admin)", "request": { "body": { "user_id": "uuid", "course_id": "uuid" } } },
+        { "name": "Test Payment Email", "method": "POST", "path": "/api/email-automation/test_payment_email/", "auth": "Bearer (Admin)", "request": { "body": { "user_id": "uuid", "course_id": "uuid" } } },
+        { "name": "Trigger Weekly Reports", "method": "POST", "path": "/api/email-automation/trigger_weekly_reports/", "auth": "Bearer (Admin)" },
+        { "name": "Test New Content Email", "method": "POST", "path": "/api/email-automation/test_new_content_email/", "auth": "Bearer (Admin)", "request": { "body": { "course_id": "uuid", "content_type": "video|quiz|assignment", "content_title": "string" } } },
+        { "name": "Email Logs (current user)", "method": "GET", "path": "/api/email-automation/email_logs/", "auth": "Bearer" },
+        { "name": "Email Preferences (Get/Update)", "method": "GET|POST", "path": "/api/email-automation/preferences/", "auth": "Bearer", "request(POST)": { "body": { "enrollment_emails": true, "progress_emails": true, "payment_emails": true, "content_emails": true, "demo_emails": true } } }
+      ]
+    },
+
+    {
+      "tag": "calendar",
+      "items": [
+        { "name": "Google Auth Redirect", "method": "GET", "path": "/api/calendar/authorize", "auth": "Session" },
+        { "name": "OAuth2 Callback", "method": "GET", "path": "/api/calendar/oauth2callback/", "auth": "Session" },
+        { "name": "Create Test Event", "method": "GET", "path": "/api/calendar/events", "auth": "Session" },
+        { "name": "Webhook Notifications", "method": "POST", "path": "/api/calendar/notifications/" },
+        { "name": "Disconnect Google", "method": "GET", "path": "/api/calendar/disconnect/", "auth": "Session" }
+      ]
+    },
+
+    {
+      "tag": "hr_job_board",
+      "items": [
+        { "name": "Categories (List/Create)", "method": "GET|POST", "path": "/api/job-board/categories/", "request(POST)": { "body": { "name": "string", "description": "string" } } },
+        { "name": "Skills (List/Create)", "method": "GET|POST", "path": "/api/job-board/skills/", "request(POST)": { "body": { "name": "string", "category": "int" } } },
+        { "name": "Employer Profile (Get/Update)", "method": "GET|PUT", "path": "/api/job-board/profile/employer/", "auth": "Bearer", "request(PUT)": { "body": { "company_name": "string", "company_description": "string", "company_website": "url", "company_logo": "file?", "company_size": "string", "industry": "string", "location": "string", "phone": "string" } } },
+        { "name": "Jobseeker Profile (Get/Update)", "method": "GET|PUT", "path": "/api/job-board/profile/jobseeker/", "auth": "Bearer", "request(PUT)": { "body": { "bio": "string", "resume": "file?", "profile_picture": "file?", "phone": "string", "location": "string", "experience_years": "int", "skill_ids": [1,2], "linkedin_url": "url?", "portfolio_url": "url?", "expected_salary": "number?", "is_actively_looking": true } } },
+        { "name": "Jobs - Public List", "method": "GET", "path": "/api/job-board/jobs/", "query": { "search": "q?", "ordering": "-created_at|..." } },
+        { "name": "Job Detail", "method": "GET", "path": "/api/job-board/jobs/{id}/" },
+        { "name": "Job Stats (Public)", "method": "GET", "path": "/api/job-board/jobs/stats/" },
+        { "name": "Search Suggestions", "method": "GET", "path": "/api/job-board/jobs/search-suggestions/", "query": { "q": "string (>=2 chars)" } },
+        { "name": "Employer Jobs (List/Create)", "method": "GET|POST", "path": "/api/job-board/employer/jobs/", "auth": "Bearer", "request(POST)": { "body": { "title": "string", "description": "string", "requirements": "string", "responsibilities": "string", "category": "int", "required_skill_ids": [1,2], "location": "string", "is_remote": false, "job_type": "full_time|part_time|contract", "experience_level": "junior|mid|senior", "min_salary": 0, "max_salary": 0, "currency": "string", "benefits": "string", "application_deadline": "datetime", "max_applications": 100 } } },
+        { "name": "Employer Job Detail (Get/Update/Delete)", "method": "GET|PUT|PATCH|DELETE", "path": "/api/job-board/employer/jobs/{id}/", "auth": "Bearer" },
+        { "name": "Update Job Status", "method": "PATCH", "path": "/api/job-board/employer/jobs/{job_id}/status/", "auth": "Bearer", "request": { "body": { "status": "draft|active|closed" } } },
+        { "name": "Applications (List/Create)", "method": "GET|POST", "path": "/api/job-board/applications/", "auth": "Bearer", "request(POST)": { "body": { "job": "int", "cover_letter": "string", "custom_resume": "file?" } } },
+        { "name": "Application Detail (Get/Update)", "method": "GET|PUT|PATCH", "path": "/api/job-board/applications/{id}/", "auth": "Bearer" },
+        { "name": "Update Application Status (Employer)", "method": "PATCH", "path": "/api/job-board/applications/{application_id}/status/", "auth": "Bearer", "request": { "body": { "status": "pending|reviewed|shortlisted|interview_scheduled|rejected|accepted", "employer_notes": "string?", "interview_date": "datetime?" } } },
+        { "name": "Withdraw Application (Jobseeker)", "method": "DELETE", "path": "/api/job-board/applications/{application_id}/withdraw/", "auth": "Bearer" },
+        { "name": "Saved Jobs (List)", "method": "GET", "path": "/api/job-board/saved-jobs/", "auth": "Bearer" },
+        { "name": "Toggle Save Job", "method": "POST|DELETE", "path": "/api/job-board/jobs/{job_id}/save/", "auth": "Bearer" },
+        { "name": "Job Alerts (List/Create)", "method": "GET|POST", "path": "/api/job-board/job-alerts/", "auth": "Bearer", "request(POST)": { "body": { "title": "string", "keywords": "string", "location": "string", "category": "int", "job_type": "string", "min_salary": 0, "is_active": true, "email_frequency": "daily|weekly|monthly" } } },
+        { "name": "Job Alert Detail (Get/Update/Delete)", "method": "GET|PUT|DELETE", "path": "/api/job-board/job-alerts/{id}/", "auth": "Bearer" },
+        { "name": "Admin Dashboard Stats", "method": "GET", "path": "/api/job-board/admin/dashboard/", "auth": "Bearer (is_staff)" },
+        { "name": "Admin Moderate Job", "method": "PATCH", "path": "/api/job-board/admin/jobs/{job_id}/moderate/", "auth": "Bearer (is_staff)", "request": { "body": { "action": "approve|block|feature" } } },
+        { "name": "Admin Verify Employer", "method": "PATCH", "path": "/api/job-board/admin/employers/{employer_id}/verify/", "auth": "Bearer (is_staff)" }
+      ]
+    }
+  ]
+}
