@@ -4,5 +4,4 @@ __pycache__/
 *.py[cod]
 *.pyc
 .venv/
-db.sqlite3
 media/
