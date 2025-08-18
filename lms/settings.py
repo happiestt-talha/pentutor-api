@@ -169,15 +169,15 @@ EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'misbahyousaf00@gmail.com'
-EMAIL_HOST_PASSWORD = 'xiio vtop aqud hsaw'
+EMAIL_HOST_USER = 'mtalhamanzoor1930@gmail.com'
+EMAIL_HOST_PASSWORD = 'zkct ikal juvk guyc'
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 # Email automation settings
 DEFAULT_FROM_EMAIL = 'noreply@lms.com'
 SITE_NAME = 'LMS Platform'
 SITE_URL = 'http://localhost:8000'
-FRONTEND_URL = 'https://pentutor.onrender.com'
+FRONTEND_URL = 'https://pentutor.vercel.app' 
 
 # Job Board specific settings
 JOB_BOARD_SETTINGS = {
