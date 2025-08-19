@@ -177,7 +177,8 @@ DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 DEFAULT_FROM_EMAIL = 'noreply@lms.com'
 SITE_NAME = 'LMS Platform'
 SITE_URL = 'http://localhost:8000'
-FRONTEND_URL = 'https://pentutor.vercel.app' 
+FRONTEND_URL = 'https://pentutor.onrender.com'
+# FRONTEND_URL = 'http://localhost:3000'
 
 # Job Board specific settings
 JOB_BOARD_SETTINGS = {
