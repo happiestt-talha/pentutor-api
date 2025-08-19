@@ -72,7 +72,7 @@ class UserRegistrationView(APIView):
         Your Role is {user.role}
         
         Please click the following link to verify your email:
-        {settings.FRONTEND_URL}/auth/verify-email/{token}/
+        {settings.FRONTEND_URL}/auth/verify-email/{token}?email={user.email}/
         
         If you didn't create this account, please ignore this email.
         
@@ -266,7 +266,7 @@ class ResendVerificationEmailView(APIView):
         Hi {user.username},
         
         Please click the following link to verify your email:
-        {settings.FRONTEND_URL}/auth/verify-email/{token}/
+        {settings.FRONTEND_URL}/auth/verify-email/{token}?email={user.email}/
         
         If you didn't request this, please ignore this email.
         

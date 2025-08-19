@@ -7,6 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import PageNumberPagination
 from django.db.models import Q, Count
 from django.shortcuts import get_object_or_404
+from django.core.exceptions import ValidationError
 from .models import Notification
 from .serializers import (
     NotificationSerializer,
@@ -65,9 +66,22 @@ class NotificationDetailView(generics.RetrieveAPIView):
     permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
-        return Notification.objects.filter(recipient=self.request.user).select_related(
-            'sender', 'course', 'video', 'quiz', 'meeting'
-        )
+        # Short-circuit during drf-yasg schema generation
+        if getattr(self, "swagger_fake_view", False):
+            return Notification.objects.none()
+
+        # If request or user missing / anonymous, return empty queryset
+        user = getattr(self.request, "user", None)
+        if not user or not user.is_authenticated:
+            return Notification.objects.none()
+
+        # Defensive: catch validation error if recipient UUID coercion fails
+        try:
+            return Notification.objects.filter(recipient=user).select_related(
+                'sender', 'course', 'video', 'quiz', 'meeting'
+            )
+        except ValidationError:
+            return Notification.objects.none()
     
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -77,6 +91,7 @@ class NotificationDetailView(generics.RetrieveAPIView):
         
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
+
 
 
 @api_view(['POST'])

@@ -7,6 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
 from django.shortcuts import get_object_or_404
 from django.db import transaction
+from django.http import Http404
 
 from .models import JobPost, JobApplication, JobReview
 from .serializers import (
@@ -106,8 +107,19 @@ class JobApplicationCreateView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated, CanApplyToJob]
 
     def get_serializer_context(self):
+        # Return a minimal safe context during schema generation
+        if getattr(self, "swagger_fake_view", False):
+            return {"request": None}
+
         context = super().get_serializer_context()
-        job_post = get_object_or_404(JobPost, id=self.kwargs['job_id'])
+
+        # safer access to kwargs to avoid KeyError during schema generation
+        job_id = self.kwargs.get('job_id')
+        if not job_id:
+            # If real request missing job_id, raise 404 (or handle as you prefer)
+            raise Http404("job_id missing")
+
+        job_post = get_object_or_404(JobPost, id=job_id)
         context['job_post'] = job_post
         return context
 
@@ -125,6 +137,7 @@ class JobApplicationCreateView(generics.CreateAPIView):
                 'message': 'Failed to submit application.',
                 'errors': str(e)
             }, status=status.HTTP_400_BAD_REQUEST)
+
 
 
 class JobApplicationListView(generics.ListAPIView):

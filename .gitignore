@@ -1,7 +1,9 @@
 ./course_videos
 ./media
-__pycache__/
+media/
+__pycache__/**
+**\__pycache__
 *.py[cod]
 *.pyc
 .venv/
-media/
+db.sqlite3

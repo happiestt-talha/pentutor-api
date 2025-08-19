@@ -232,7 +232,7 @@ def schedule_meeting_reminder(meeting):
     method='get',
     operation_summary="Get list of participants in a meeting",
     tags=["Meetings"],
-    manual_parameters=[ ... ]
+    manual_parameters=[ ]
 )
 @api_view(['GET'])
 @permission_classes([AllowAny])
