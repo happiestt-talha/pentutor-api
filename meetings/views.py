@@ -2,8 +2,7 @@
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated,AllowAny
 from .serializers import (
     MeetingSerializer, ParticipantSerializer, CreateMeetingSerializer,
     JoinMeetingSerializer, 
@@ -227,45 +226,6 @@ def schedule_meeting_reminder(meeting):
             )
         except Exception as e:
             print(f"Error scheduling meeting reminder: {e}")
-            
-@swagger_auto_schema(
-    method='get',
-    operation_summary="Get list of participants in a meeting",
-    tags=["Meetings"],
-    manual_parameters=[ ]
-)
-@api_view(['GET'])
-@permission_classes([AllowAny])
-def get_meeting(request, meeting_id):
-    """
-    Return meeting details for the given meeting_id (UUID string).
-    - Uses MeetingSerializer to keep payload consistent.
-    - Adds `is_password_protected` for frontend compatibility.
-    - Masks 'password' for non-hosts/non-staff.
-    """
-    try:
-        meeting = Meeting.objects.get(meeting_id=meeting_id)
-    except Meeting.DoesNotExist:
-        return Response({'error': 'Meeting not found'}, status=status.HTTP_404_NOT_FOUND)
-
-    serialized = MeetingSerializer(meeting, context={'request': request}).data
-
-    # Add compatibility flag your frontend expects
-    serialized['is_password_protected'] = bool(getattr(meeting, 'is_password_required', False))
-
-    # Mask password unless request user is host or staff
-    try:
-        is_host_or_staff = (
-            request.user.is_authenticated and
-            (request.user == meeting.host or request.user.is_staff)
-        )
-    except Exception:
-        is_host_or_staff = False
-
-    if not is_host_or_staff:
-        serialized.pop('password', None)  # don't leak password to public
-
-    return Response(serialized, status=status.HTTP_200_OK)
 
 @swagger_auto_schema(
     method='post',
@@ -420,7 +380,7 @@ def create_meeting(request):
 @permission_classes([IsAuthenticated])
 def join_meeting(request, meeting_id):
     """Join an existing meeting with access control"""
-    serializer = JoinMeetingSerializer(data=request.data)
+    serializer = JoinMeetingSerializer(data=request.data,context={'request':request})
     
     if not serializer.is_valid():
         return Response(
@@ -544,10 +504,10 @@ def join_meeting(request, meeting_id):
             }
         )
         
-        if not created and participant.is_active:
-            return Response({
-                'error': 'You are already in this meeting'
-            }, status=status.HTTP_400_BAD_REQUEST)
+        # if not created and participant.is_active:
+        #     return Response({
+        #         'error': 'You are already in this meeting'
+        #     }, status=status.HTTP_400_BAD_REQUEST)
         
         # Rejoin if previously left
         if not created:
@@ -564,7 +524,7 @@ def join_meeting(request, meeting_id):
         
         return Response({
             'participant': ParticipantSerializer(participant).data,
-            'meeting': MeetingSerializer(meeting, context={'request': request}).data,
+            'meeting': MeetingSerializer(meeting,context={'request': request}).data,
             'message': 'Successfully joined meeting'
         }, status=status.HTTP_200_OK)
         
@@ -572,6 +532,170 @@ def join_meeting(request, meeting_id):
         return Response({
             'error': 'Meeting not found'
         }, status=status.HTTP_404_NOT_FOUND)
+
+
+# @api_view(['POST'])
+# @permission_classes([IsAuthenticated])
+# def handle_join_request(request, meeting_id):
+#     """Approve or deny join requests (host/co-host only)"""
+#     serializer = HandleJoinRequestSerializer(data=request.data)
+    
+#     if not serializer.is_valid():
+#         return Response(
+#             {'errors': serializer.errors},
+#             status=status.HTTP_400_BAD_REQUEST
+#         )
+    
+#     try:
+#         meeting = Meeting.objects.get(meeting_id=meeting_id)
+        
+#         # Check if user is host or co-host
+#         participant = Participant.objects.get(
+#             meeting=meeting,
+#             user=request.user,
+#             role__in=['host', 'co_host'],
+#             left_at__isnull=True
+#         )
+        
+#         request_id = serializer.validated_data['request_id']
+#         action = serializer.validated_data['action']
+        
+#         join_request = JoinRequest.objects.get(
+#             id=request_id,
+#             meeting=meeting,
+#             status='pending'
+#         )
+        
+#         if action == 'approve':
+#             join_request.approve(request.user)
+            
+#             # Notify the requester
+#             notify_join_request_response(join_request, 'approved')
+            
+#             message = f"Join request from {join_request.display_name} approved"
+        
+#         else:  # deny
+#             join_request.deny(request.user)
+            
+#             # Notify the requester
+#             notify_join_request_response(join_request, 'denied')
+            
+#             message = f"Join request from {join_request.display_name} denied"
+        
+#         return Response({
+#             'message': message,
+#             'request': JoinRequestSerializer(join_request).data
+#         }, status=status.HTTP_200_OK)
+        
+#     except Meeting.DoesNotExist:
+#         return Response({
+#             'error': 'Meeting not found'
+#         }, status=status.HTTP_404_NOT_FOUND)
+    
+#     except Participant.DoesNotExist:
+#         return Response({
+#             'error': 'Only host or co-host can handle join requests'
+#         }, status=status.HTTP_403_FORBIDDEN)
+    
+#     except JoinRequest.DoesNotExist:
+#         return Response({
+#             'error': 'Join request not found'
+#         }, status=status.HTTP_404_NOT_FOUND)
+
+
+# @api_view(['GET'])
+# @permission_classes([IsAuthenticated])
+# def get_join_requests(request, meeting_id):
+#     """Get pending join requests for a meeting (host/co-host only)"""
+#     try:
+#         meeting = Meeting.objects.get(meeting_id=meeting_id)
+        
+#         # Check if user is host or co-host
+#         participant = Participant.objects.get(
+#             meeting=meeting,
+#             user=request.user,
+#             role__in=['host', 'co_host'],
+#             left_at__isnull=True
+#         )
+        
+#         pending_requests = meeting.join_requests.filter(status='pending')
+        
+#         return Response({
+#             'requests': JoinRequestSerializer(pending_requests, many=True).data
+#         }, status=status.HTTP_200_OK)
+        
+#     except Meeting.DoesNotExist:
+#         return Response({
+#             'error': 'Meeting not found'
+#         }, status=status.HTTP_404_NOT_FOUND)
+    
+#     except Participant.DoesNotExist:
+#         return Response({
+#             'error': 'Only host or co-host can view join requests'
+#         }, status=status.HTTP_403_FORBIDDEN)
+
+
+# @api_view(['POST'])
+# @permission_classes([IsAuthenticated])
+# def send_invites(request, meeting_id):
+#     """Send invites to additional participants"""
+#     serializer = SendInviteSerializer(data=request.data)
+    
+#     if not serializer.is_valid():
+#         return Response(
+#             {'errors': serializer.errors},
+#             status=status.HTTP_400_BAD_REQUEST
+#         )
+    
+#     try:
+#         meeting = Meeting.objects.get(meeting_id=meeting_id)
+        
+#         # Check if user is host or co-host
+#         participant = Participant.objects.get(
+#             meeting=meeting,
+#             user=request.user,
+#             role__in=['host', 'co_host'],
+#             left_at__isnull=True
+#         )
+        
+#         emails = serializer.validated_data['emails']
+#         created_invites = []
+        
+#         for email in emails:
+#             invite, created = MeetingInvite.objects.get_or_create(
+#                 meeting=meeting,
+#                 email=email,
+#                 defaults={'invited_by': request.user}
+#             )
+            
+#             if created:
+#                 # Try to link to existing user
+#                 try:
+#                     user = User.objects.get(email=email)
+#                     invite.user = user
+#                     invite.save()
+#                 except User.DoesNotExist:
+#                     pass
+                
+#                 created_invites.append(invite)
+                
+#                 # Send email invitation (implement as needed)
+#                 send_meeting_invitation(invite)
+        
+#         return Response({
+#             'message': f'Sent {len(created_invites)} new invitations',
+#             'invites': MeetingInviteSerializer(created_invites, many=True).data
+#         }, status=status.HTTP_200_OK)
+        
+#     except Meeting.DoesNotExist:
+#         return Response({
+#             'error': 'Meeting not found'
+#         }, status=status.HTTP_404_NOT_FOUND)
+    
+#     except Participant.DoesNotExist:
+#         return Response({
+#             'error': 'Only host or co-host can send invites'
+#         }, status=status.HTTP_403_FORBIDDEN)
 
 @swagger_auto_schema(
     method='post',
@@ -684,6 +808,100 @@ def end_meeting(request, meeting_id):
             'error': 'Only host or co-host can end meeting'
         }, status=status.HTTP_403_FORBIDDEN)
 
+
+
+
+@swagger_auto_schema(
+    method='get',
+    operation_summary="Get live class details",
+    operation_description="Retrieve details of a specific live class belonging to the authenticated teacher.",
+    manual_parameters=[
+        openapi.Parameter(
+            'meeting_id',
+            openapi.IN_PATH,
+            description="UUID of the live class",
+            type=openapi.TYPE_INTEGER
+           
+        )
+    ],
+    security=[{'Bearer': []}]
+)
+
+@swagger_auto_schema(
+    method='delete',
+    operation_summary="Cancel a live class",
+    operation_description="Cancel a specific live class belonging to the authenticated teacher.",
+    manual_parameters=[
+        openapi.Parameter(
+            'meeting_id',
+            openapi.IN_PATH,
+            description="UUID of the live class",
+            type=openapi.TYPE_INTEGER
+        
+        )
+    ],
+ security=[{'Bearer': []}]
+)
+@api_view(['GET', 'DELETE'])
+@permission_classes([AllowAny])
+def meting_detail(request, meeting_id):
+    """
+    Get, update or delete specific live class
+    """
+    
+    
+    try:
+        # teacher = TeacherProfile.objects.get(user=request.user)
+
+        live_class = Meeting.objects.get(
+            id=meeting_id, 
+        )
+   
+    except Meeting.DoesNotExist:
+        return Response({
+            'success': False,
+            'message': 'Meeting class not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    
+    if request.method == 'GET':
+        serializer = MeetingSerializer(live_class,context={"request":request})
+        return Response({
+            'success': True,
+            'data': serializer.data
+        }, status=status.HTTP_200_OK)
+    
+    # elif request.method == 'PUT':
+    #     # Update live class details
+    #     allowed_fields = ['title', 'scheduled_time', 'max_participants', 'is_recorded']
+    #     for field in allowed_fields:
+    #         if field in request.data:
+    #             setattr(live_class, field, request.data[field])
+        
+    #     live_class.save()
+        
+      
+    #     serializer = LiveClassSerializer(live_class)
+    #     return Response({
+    #         'success': True,
+    #         'message': 'Live class updated successfully',
+    #         'data': serializer.data
+    #     }, status=status.HTTP_200_OK)
+    
+    elif request.method == 'DELETE':
+        if live_class.status == 'active':
+            return Response({
+                'success': False,
+                'message': 'Cannot delete active live class'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        live_class.delete()
+        return Response({
+            'success': True,
+            'message': 'Meeting deleted successfully'
+        }, status=status.HTTP_200_OK)
+    
+
+    
 
 @swagger_auto_schema(
     method='get',
@@ -805,6 +1023,7 @@ def notify_participant_joined(meeting_id, participant, user):
 
 
 def send_meeting_invitation(invite):
+
     """Send email invitation (implement based on your email service)"""
     try:
         subject = f'You are invited to join "{invite.meeting.title}"'

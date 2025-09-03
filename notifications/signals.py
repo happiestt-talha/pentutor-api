@@ -7,7 +7,7 @@ from courses.models import Video, Quiz, Enrollment
 from meetings.models import Meeting
 from payments.models import Payment
 from .models import Notification
-from authentication.models import TeacherProfile,StudentProfile
+from authentication.models import TeacherProfile,StudentProfile,StudentQuery
 
 User = get_user_model()
 
@@ -207,21 +207,27 @@ def notify_enrollment_direct(sender, instance, created, **kwargs):
 
 
 
-
-def send_admin_notification(sender, instance, role_type):
+def send_admin_notification(sender,instance, role_type):
     """Send notification + email to all admins"""
     admins = User.objects.filter(is_superuser=True)
+    sender_user = getattr(instance, "user", None) or getattr(instance, "linked_user", None)
+
+    # Message build karo
+    if isinstance(instance, StudentQuery):
+        title = f"New Student Query"
+        message = f"A new student query has been submitted by {instance.name} ({instance.email}) from {instance.area}. Subject interests: {instance.subjects}"
+    else:
+        title = f"New {role_type.replace('_', ' ').title()}"
+        message = f"{sender_user.username if sender_user else 'Unknown'} has requested to become a {role_type.split('_')[0]}."
+
     for admin in admins:
-        # Create Notification
         Notification.objects.create(
             recipient=admin,
-            sender=instance.user,
+            sender=sender_user,  # ho to user, warna None
             notification_type=role_type,
-            title=f"New {role_type.replace('_', ' ').title()}",
-            message=f"{instance.user.username} has requested to become a {role_type.split('_')[0]}."
+            title=title,
+            message=message
         )
-
-
 
 @receiver(post_save, sender=StudentProfile)
 def student_role_request_created(sender, instance, created, **kwargs):
@@ -233,3 +239,8 @@ def student_role_request_created(sender, instance, created, **kwargs):
 def teacher_role_request_created(sender, instance, created, **kwargs):
     if created:
         send_admin_notification(sender, instance, "teacher_request")
+
+@receiver(post_save,sender=StudentQuery)
+def student_query_form_created(sender, instance, created, **kwargs):
+    if created:
+        send_admin_notification(sender,instance, "student_query")

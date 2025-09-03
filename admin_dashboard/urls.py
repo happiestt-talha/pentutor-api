@@ -35,4 +35,7 @@ urlpatterns = [
     # Review profile (approve/reject)
     path('review-profile/',  views.admin_review_profile, name='admin_review_profile' ),
 
+    path('student-queries/', views.AdminStudentQueriesView.as_view(), name='admin-student-queries'),
+    path('student-queries/<int:query_id>/', views.AdminStudentQueriesView.as_view(), name='update-student-query'),
+
 ]

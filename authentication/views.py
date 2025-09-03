@@ -1,23 +1,24 @@
 # authenticate/view.py
-
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken,AccessToken
-from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.core.mail import send_mail
 from django.conf import settings
 from django.utils.crypto import get_random_string
 from django.shortcuts import get_object_or_404
-from .models import User,StudentProfile,TeacherProfile
+from django.db import transaction
+from .models import User,StudentProfile,TeacherProfile,StudentQuery
 from .serializers import (
     UserRegistrationSerializer, 
     UserLoginSerializer, 
     UserSerializer,
     RoleUpdateSerializer,
     StudentProfileSerializer,
-    TeacherProfileSerializer
+    TeacherProfileSerializer,
+    StudentQuerySerializer,
+    StudentQueryListSerializer
 )
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
@@ -72,7 +73,7 @@ class UserRegistrationView(APIView):
         Your Role is {user.role}
         
         Please click the following link to verify your email:
-        {settings.FRONTEND_URL}/auth/verify-email/{token}?email={user.email}/
+        http://localhost:8000/api/auth/verify-email/{token}/
         
         If you didn't create this account, please ignore this email.
         
@@ -266,7 +267,7 @@ class ResendVerificationEmailView(APIView):
         Hi {user.username},
         
         Please click the following link to verify your email:
-        {settings.FRONTEND_URL}/auth/verify-email/{token}?email={user.email}/
+        http://localhost:8000/api/auth/verify-email/{token}/
         
         If you didn't request this, please ignore this email.
         
@@ -393,144 +394,175 @@ class CreateStudentProfileView(APIView):
     )
 
     def post(self, request):
-        student_profile, created = StudentProfile.objects.get_or_create(
-        user=request.user,
-        defaults={"email": request.user.email}
-    )
             
-        serializer = StudentProfileSerializer(student_profile,data=request.data,partial=True)
-        if serializer.is_valid():
-            request.user.role = 'student'
-            request.user.save(update_fields=["role"])
-            serializer.save(user=request.user, email=request.user.email)
-            return Response({"success": True, "message": "Student profile created", "data": serializer.data}, status=201)
+        with transaction.atomic():
+
+            # Check if student query exists for this email
+            existing_query = StudentQuery.objects.filter(
+                    email=request.user.email,
+                    is_registered=False
+                ).first()
+            
+            # Create or get student profile
+            student_profile, created = StudentProfile.objects.get_or_create(
+            user=request.user,
+            defaults={"email": request.user.email})
+        
+        
+            # If existing query found, pre-populate some fields
+            if existing_query and created:
+                # Map query data to profile fields
+                profile_data = request.data.copy()
+                profile_data.update({
+                    'full_name': existing_query.name,
+                    'city': existing_query.area,
+                    'phone': existing_query.contact_no,
+                })
+                
+                # Update query status
+                existing_query.is_registered = True
+                existing_query.linked_user = request.user
+                existing_query.save()
+                
+            else:
+                profile_data = request.data
+            
+            
+            serializer = StudentProfileSerializer(student_profile,data=request.data,partial=True)
+            if serializer.is_valid():
+                request.user.role = 'student'
+                request.user.save(update_fields=["role"])
+                serializer.save(user=request.user, email=request.user.email)
+                return Response({"success": True, "message": "Student profile created", "data": serializer.data}, status=201)
         
         return Response({"success": False, "errors": serializer.errors}, status=400)
 
 
 class CreateTeacherProfileView(APIView):
     permission_classes = [IsAuthenticated]
-    parser_classes = (MultiPartParser, FormParser, JSONParser)
-
     @swagger_auto_schema(
         request_body=TeacherProfileSerializer,
         responses={
-            201: openapi.Response('Registration Successful', TeacherProfileSerializer),
+        201: openapi.Response('Registration Successful', TeacherProfileSerializer),
+        400: 'Bad Request'
+    }
+    )
+    def post(self, request):
+        if hasattr(request.user, 'teacher_profile'):
+            return Response({"success": False, "message": "Teacher profile already exists"}, status=400)
+        
+         # 1️⃣ Parse the JSON string from `data` key in form-data
+        try:
+            data_json = json.loads(request.data.get('data', '{}'))
+        except json.JSONDecodeError:
+            return Response({"success": False, "message": "Invalid JSON in 'data' field"}, status=400)
+        
+        # 2️⃣ Merge files into data dictionary
+        data_json['resume'] = request.FILES.get('resume')
+        data_json['degree_certificates'] = request.FILES.get('degree_certificates')
+        data_json['id_proof'] = request.FILES.get('id_proof')
+
+        # 3️⃣ Inject user and email
+        data_json['user'] = request.user
+        data_json['full_name'] = f"{request.user.first_name} {request.user.last_name}"
+        data_json['email'] = request.user.email
+        data_json['status'] = "pending"
+
+
+        serializer = TeacherProfileSerializer(data=data_json)
+        if serializer.is_valid():
+            serializer.save(user=request.user, email=request.user.email, status="pending")  # pending approval
+            return Response({"success": True, "message": "Teacher profile submitted for approval", "data": serializer.data}, status=201)
+        
+        return Response({"success": False, "errors": serializer.errors}, status=400)
+
+# ==========================
+# Student query form
+# =======================
+
+class StudentQueryView(APIView):
+    """
+    Handle student query form submission (no authentication required)
+    """
+    permission_classes = [AllowAny]
+    
+    @swagger_auto_schema(
+        request_body=StudentQuerySerializer,
+        responses={
+            201: openapi.Response('Query Submitted Successfully', StudentQuerySerializer),
             400: 'Bad Request'
         }
     )
     def post(self, request):
-        # Prevent duplicate
-        if hasattr(request.user, 'teacher_profile'):
-            return Response({"success": False, "message": "Teacher profile already exists"}, status=400)
-
-        # copy request.data (QueryDict) to a mutable dict
-        data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
-
-        # Helper to get repeated fields
-        def get_repeated(key):
-            try:
-                return request.data.getlist(key)
-            except Exception:
-                # getlist may not be available — fall back to single value
-                v = request.data.get(key)
-                return [v] if v is not None else []
-
-        # Fields we expect to be JSON/list/object
-        json_fields = [
-            "expertise_areas",
-            "education",
-            "certifications",
-            "awards",
-            "publications",
-            "languages_spoken",
-            "availability_schedule",
-            "preferred_teaching_methods",
-            "course_categories",
-            "notification_preferences",
-            "social_links",
-            "additional_documents",
-        ]
-
-        # Normalize array-style repeated keys (field[]), prefer explicit field value if present
-        for field in json_fields:
-            # If plain field exists and is non-empty, leave it (serializer will parse it)
-            raw = request.data.get(field)
-            if raw not in (None, ""):
-                # plain value present — keep as-is (likely JSON string or already parsed)
-                data[field] = raw
-                continue
-
-            # Otherwise look for repeated `field[]`
-            arr = get_repeated(f"{field}[]")
-            if arr:
-                # arr may contain JSON strings or primitive strings. Try to parse individual items, else keep raw.
-                normalized = []
-                for item in arr:
-                    if item is None or item == "":
-                        continue
-                    if isinstance(item, str):
-                        item = item.strip()
-                        # try JSON parse if looks like json
-                        if (item.startswith("{") and item.endswith("}")) or (item.startswith("[") and item.endswith("]")):
-                            try:
-                                normalized.append(json.loads(item))
-                                continue
-                            except Exception:
-                                pass
-                        normalized.append(item)
-                    else:
-                        normalized.append(item)
-                # set JSON-string representation so serializer.to_internal_value() can json.loads it
-                data[field] = json.dumps(normalized)
-                continue
-
-            # For nested objects like availability_schedule, look for keys like availability_schedule[Monday]
-            # collect subkeys
-            nested = {}
-            for key in request.data.keys():
-                if key.startswith(f"{field}[") and key.endswith("]"):
-                    # form key like availability_schedule[Monday]
-                    subkey = key[len(field) + 1 : -1]
-                    val = request.data.get(key)
-                    # if the value looks like a JSON array string, parse it, else try getlist for repeated items
-                    if val and isinstance(val, str) and val.strip().startswith("["):
-                        try:
-                            nested[subkey] = json.loads(val)
-                            continue
-                        except Exception:
-                            pass
-                    # try getlist for availability_schedule[Monday][]
-                    sub_arr = get_repeated(f"{field}[{subkey}][]")
-                    if sub_arr:
-                        nested[subkey] = sub_arr
-                    elif val not in (None, ""):
-                        nested[subkey] = [val] if not isinstance(val, list) else val
-
-            if nested:
-                data[field] = json.dumps(nested)
-
-        # Attach files explicitly if present (some serializers expect file objects in data)
-        for file_field in ("resume", "degree_certificates", "id_proof", "profile_picture", "cnic_front", "cnic_back", "degree_image"):
-            f = request.FILES.get(file_field)
-            if f:
-                data[file_field] = f
-
-        # Inject user-related fields if you want defaults (full_name/email/status)
-        # Only set if not already provided by client
-        if not data.get("full_name"):
-            data["full_name"] = f"{request.user.first_name} {request.user.last_name}".strip()
-        if not data.get("email"):
-            data["email"] = request.user.email or ""
-        data["status"] = data.get("status", "pending")
-
-        # Instantiate serializer — serializer.to_internal_value() will parse JSON strings
-        serializer = TeacherProfileSerializer(data=data)
+        serializer = StudentQuerySerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save(user=request.user, email=request.user.email, status="pending")
-            return Response({"success": True, "message": "Teacher profile submitted for approval", "data": serializer.data}, status=201)
+            # Check if query already exists for this email
+            email = serializer.validated_data['email']
+            existing_query = StudentQuery.objects.filter(email=email).first()
+            
+            if existing_query:
+                return Response({
+                    'success': False,
+                    'message': 'A query with this email already exists. Please contact admin for updates.',
+                    'data': {'query_id': existing_query.id}
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Save the query
+            query = serializer.save()
+            
+            # Create admin notification
+            # self.create_admin_notification(query)
+            
+            # Send confirmation email to student
+            self.send_confirmation_email(query)
+            
+            return Response({
+                'success': True,
+                'message': 'Your query has been submitted successfully! We will contact you soon.',
+                'data': serializer.data
+            }, status=status.HTTP_201_CREATED)
+        
+        return Response({
+            'success': False,
+            'message': 'Please check your information and try again.',
+            'errors': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # def create_admin_notification(self, query):
+    #     """Create notification for admin"""
+    #     Notification.objects.create(
+    #         title=f"New Student Query from {query.name}",
+    #         message=f"A new student query has been submitted by {query.name} ({query.email}) from {query.area}. Subject interests: {query.subjects}",
+    #         notification_type='student_query',
+    #         student_query=query
+    #     )
+    
+    def send_confirmation_email(self, query):
+        """Send confirmation email to student"""
+        subject = 'Query Received - LMS Platform'
+        message = f'''
+        Hi {query.name},
+        
+        Thank you for your interest in our LMS platform!
+        
+        We have received your query with the following details:
+        - Name: {query.name}
+        - Email: {query.email}
+        - Area: {query.area}
+        - Class: {query.current_class}
+        - Subjects: {query.subjects}
+        
+        Our team will review your query and contact you within 24-48 hours.
+        
+        Best regards,
+        LMS Team
+        '''
+        
+        try:
+            send_mail(subject, message, settings.EMAIL_HOST_USER, [query.email])
+        except Exception as e:
+            print(f"Email sending failed: {e}")
 
-        return Response({"success": False, "errors": serializer.errors}, status=400)
 
 # ===================================
 # Admin Content

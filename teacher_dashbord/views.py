@@ -4,10 +4,11 @@ from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from authentication.models import TeacherProfile,StudentProfile
-from courses.models import Course, Video, Quiz, Assignment, Enrollment
-from courses.serializers import CourseListSerializer, VideoDetailSerializer, QuizSerializer, AssignmentSerializer
-from .serializers import TeacherCourseSerializer, TeacherVideoSerializer, TeacherQuizSerializer, EnrolledStudentSerializer,LiveClassSerializer
+from django.db import transaction
+from authentication.models import TeacherProfile
+from courses.models import Course, Video, Quiz, Assignment, Enrollment, Topic
+from courses.serializers import CourseListSerializer, VideoDetailSerializer, QuizSerializer, AssignmentSerializer 
+from .serializers import TeacherCourseSerializer, TeacherVideoSerializer, TeacherQuizSerializer, EnrolledStudentSerializer,LiveClassSerializer, TeacherAssignmentSerializer,TeacherTopicSerializer
 from meetings.models import Meeting
 from django.core.mail import send_mail
 from datetime import datetime
@@ -79,7 +80,7 @@ def teacher_dashboard(request):
                 'total_quizzes': total_quizzes,
                 'total_live_classes': total_live_classes,
             },
-            'recent_courses': CourseListSerializer(recent_courses, many=True,context={'request': request}).data
+            'recent_courses': CourseListSerializer(recent_courses, many=True).data
         }
     }, status=status.HTTP_200_OK)
 
@@ -404,7 +405,18 @@ def teacher_course_videos(request, course_id):
     elif request.method == 'POST':
         serializer = TeacherVideoSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save(course=course)
+            topic_id = request.data.get('topic')
+            if topic_id:
+                try:
+                    topic = Topic.objects.get(id=topic_id, course=course)
+                    serializer.save(course=course, topic=topic)
+                except Topic.DoesNotExist:
+                    return Response({
+                        'success': False,
+                        'message': 'Topic not found or does not belong to this course'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                serializer.save(course=course)
             return Response({
                 'success': True,
                 'message': 'Video added successfully',
@@ -524,6 +536,45 @@ def teacher_video_detail(request, video_id):
             'message': 'Video deleted successfully'
         }, status=status.HTTP_200_OK)
 
+
+# Topic specific videos
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def teacher_topic_videos(request, topic_id):
+    """
+    Get videos for a specific topic
+    """
+    if request.user.role != 'teacher':
+        return Response({
+            'success': False,
+            'message': 'Access denied. Teacher privileges required.'
+        }, status=status.HTTP_403_FORBIDDEN)
+    
+    try:
+        teacher = TeacherProfile.objects.get(user=request.user)
+        topic = Topic.objects.get(id=topic_id, course__teacher=teacher, is_active=True)
+    except TeacherProfile.DoesNotExist:
+        return Response({
+            'success': False,
+            'message': 'Teacher profile not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Topic.DoesNotExist:
+        return Response({
+            'success': False,
+            'message': 'Topic not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    
+    if request.method == 'GET':
+        videos = Video.objects.filter(topic=topic).order_by('order')
+        serializer = TeacherVideoSerializer(videos, many=True)
+        return Response({
+            'success': True,
+            'data': {
+                'topic': topic.title,
+                'videos': serializer.data
+            }
+        }, status=status.HTTP_200_OK)
+    
 # =================================
 # Teacher Get Course student
 # =================================
@@ -658,7 +709,32 @@ def teacher_course_quizzes(request, course_id):
     elif request.method == 'POST':
         serializer = TeacherQuizSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save(course=course)
+            # Validate topic belongs to the same course if provided
+            topic_id = request.data.get('topic')
+            video_id = request.data.get('video')
+            
+            topic = None
+            video = None
+            
+            if topic_id:
+                try:
+                    topic = Topic.objects.get(id=topic_id, course=course)
+                except Topic.DoesNotExist:
+                    return Response({
+                        'success': False,
+                        'message': 'Topic not found or does not belong to this course'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            
+            if video_id:
+                try:
+                    video = Video.objects.get(id=video_id, course=course)
+                except Video.DoesNotExist:
+                    return Response({
+                        'success': False,
+                        'message': 'Video not found or does not belong to this course'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            
+            serializer.save(course=course,topic=topic,video = video)
             return Response({
                 'success': True,
                 'message': 'Quiz created successfully',
@@ -672,6 +748,44 @@ def teacher_course_quizzes(request, course_id):
         }, status=status.HTTP_400_BAD_REQUEST)
 
 
+
+# Topic specific quizzes
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def teacher_topic_quizzes(request, topic_id):
+    """
+    Get quizzes for a specific topic
+    """
+    if request.user.role != 'teacher':
+        return Response({
+            'success': False,
+            'message': 'Access denied. Teacher privileges required.'
+        }, status=status.HTTP_403_FORBIDDEN)
+    
+    try:
+        teacher = TeacherProfile.objects.get(user=request.user)
+        topic = Topic.objects.get(id=topic_id, course__teacher=teacher, is_active=True)
+    except TeacherProfile.DoesNotExist:
+        return Response({
+            'success': False,
+            'message': 'Teacher profile not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Topic.DoesNotExist:
+        return Response({
+            'success': False,
+            'message': 'Topic not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    
+    if request.method == 'GET':
+        quizzes = Quiz.objects.filter(topic=topic).order_by('order')
+        serializer = TeacherQuizSerializer(quizzes, many=True)
+        return Response({
+            'success': True,
+            'data': {
+                'topic': topic.title,
+                'quizzes': serializer.data
+            }
+        }, status=status.HTTP_200_OK)
 
 @swagger_auto_schema(
     method='get',
@@ -777,6 +891,378 @@ def teacher_quiz_detail(request, quiz_id):
             'success': True,
             'message': 'Quiz deleted successfully'
         }, status=status.HTTP_200_OK)
+
+
+# ================================
+# Assigments apis
+# ==================================
+
+
+# Assignment views with topic support
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def teacher_course_assignments(request, course_id):
+    """
+    Get course assignments or create new assignment
+    """
+    if request.user.role != 'teacher':
+        return Response({
+            'success': False,
+            'message': 'Access denied. Teacher privileges required.'
+        }, status=status.HTTP_403_FORBIDDEN)
+    
+    try:
+        teacher = TeacherProfile.objects.get(user=request.user)
+        course = Course.objects.get(id=course_id, teacher=teacher)
+    except TeacherProfile.DoesNotExist:
+        return Response({
+            'success': False,
+            'message': 'Teacher profile not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Course.DoesNotExist:
+        return Response({
+            'success': False,
+            'message': 'Course not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    
+    if request.method == 'GET':
+        assignments = Assignment.objects.filter(course=course).order_by('order')
+        serializer = TeacherAssignmentSerializer(assignments, many=True)
+        return Response({
+            'success': True,
+            'data': serializer.data
+        }, status=status.HTTP_200_OK)
+    
+    elif request.method == 'POST':
+        serializer = TeacherAssignmentSerializer(data=request.data)
+        if serializer.is_valid():
+            # Validate topic belongs to the same course if provided
+            topic_id = request.data.get('topic')
+            video_id = request.data.get('video')
+            
+            topic = None
+            video = None
+            
+            if topic_id:
+                try:
+                    topic = Topic.objects.get(id=topic_id, course=course)
+                except Topic.DoesNotExist:
+                    return Response({
+                        'success': False,
+                        'message': 'Topic not found or does not belong to this course'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            
+            if video_id:
+                try:
+                    video = Video.objects.get(id=video_id, course=course)
+                except Video.DoesNotExist:
+                    return Response({
+                        'success': False,
+                        'message': 'Video not found or does not belong to this course'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            
+            serializer.save(course=course, topic=topic, video=video)
+            
+            return Response({
+                'success': True,
+                'message': 'Assignment created successfully',
+                'data': serializer.data
+            }, status=status.HTTP_201_CREATED)
+        
+        return Response({
+            'success': False,
+            'message': 'Assignment creation failed',
+            'errors': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+
+# Topic specific assignments
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def teacher_topic_assignments(request, topic_id):
+    """
+    Get assignments for a specific topic 
+    """
+    if request.user.role != 'teacher':
+        return Response({
+            'success': False,
+            'message': 'Access denied. Teacher privileges required.'
+        }, status=status.HTTP_403_FORBIDDEN)
+    
+    try:
+        teacher = TeacherProfile.objects.get(user=request.user)
+        topic = Topic.objects.get(id=topic_id, course__teacher=teacher, is_active=True)
+    except TeacherProfile.DoesNotExist:
+        return Response({
+            'success': False,
+            'message': 'Teacher profile not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Topic.DoesNotExist:
+        return Response({
+            'success': False,
+            'message': 'Topic not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    
+    if request.method == 'GET':
+        assignments = Assignment.objects.filter(topic=topic).order_by('order')
+        serializer = TeacherAssignmentSerializer(assignments, many=True)
+        return Response({
+            'success': True,
+            'data': {
+                'topic': topic.title,
+                'assignments': serializer.data
+            }
+        }, status=status.HTTP_200_OK)
+    
+    
+
+
+# ==============================
+# Teacher Topics create
+# ==================================
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def teacher_course_topics(request, course_id):
+    """
+    Get course topics or create new topic for course
+    """
+    if request.user.role != 'teacher':
+        return Response({
+            'success': False,
+            'message': 'Access denied. Teacher privileges required.'
+        }, status=status.HTTP_403_FORBIDDEN)
+    
+    try:
+        teacher = TeacherProfile.objects.get(user=request.user)
+        course = Course.objects.get(id=course_id, teacher=teacher)
+    except TeacherProfile.DoesNotExist:
+        return Response({
+            'success': False,
+            'message': 'Teacher profile not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Course.DoesNotExist:
+        return Response({
+            'success': False,
+            'message': 'Course not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    
+    if request.method == 'GET':
+        topics = Topic.objects.filter(course=course, is_active=True).order_by('order')
+        serializer = TeacherTopicSerializer(topics, many=True)
+        return Response({
+            'success': True,
+            'data': {
+                'course_title': course.title,
+                'total_topics': topics.count(),
+                'topics': serializer.data
+            }
+        }, status=status.HTTP_200_OK)
+    
+    elif request.method == 'POST':
+        # Auto-set order if not provided
+        if 'order' not in request.data:
+            last_topic = Topic.objects.filter(course=course).order_by('-order').first()
+            next_order = (last_topic.order + 1) if last_topic else 1
+            request.data['order'] = next_order
+        else:
+            # Check if order already exists for this course
+            order_value = request.data['order']
+            if Topic.objects.filter(course=course, order=order_value).exists():
+                # Find the next available order
+                existing_orders = Topic.objects.filter(
+                    course=course, 
+                    order__gte=order_value
+                ).order_by('order')
+                
+                # Shift all existing orders by 1
+                for topic in existing_orders:
+                    topic.order += 1
+                    topic.save()
+
+        serializer = TeacherTopicSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(course=course)
+            return Response({
+                'success': True,
+                'message': 'Topic created successfully',
+                'data': serializer.data
+            }, status=status.HTTP_201_CREATED)
+        
+        return Response({
+            'success': False,
+            'message': 'Topic creation failed',
+            'errors': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def teacher_topic_detail(request, topic_id):
+    """
+    Get, update or delete specific topic
+    """
+    if request.user.role != 'teacher':
+        return Response({
+            'success': False,
+            'message': 'Access denied. Teacher privileges required.'
+        }, status=status.HTTP_403_FORBIDDEN)
+    
+    try:
+        teacher = TeacherProfile.objects.get(user=request.user)
+        topic = Topic.objects.get(id=topic_id, course__teacher=teacher)
+    except TeacherProfile.DoesNotExist:
+        return Response({
+            'success': False,
+            'message': 'Teacher profile not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Topic.DoesNotExist:
+        return Response({
+            'success': False,
+            'message': 'Topic not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    
+    if request.method == 'GET':
+        serializer = TeacherTopicSerializer(topic)
+        return Response({
+            'success': True,
+            'data': serializer.data
+        }, status=status.HTTP_200_OK)
+    
+    elif request.method == 'PUT':
+        serializer = TeacherTopicSerializer(topic, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                'success': True,
+                'message': 'Topic updated successfully',
+                'data': serializer.data
+            }, status=status.HTTP_200_OK)
+        
+        return Response({
+            'success': False,
+            'message': 'Topic update failed',
+            'errors': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    elif request.method == 'DELETE':
+        # Soft delete - just set is_active to False
+        topic.is_active = False
+        topic.save()
+        return Response({
+            'success': True,
+            'message': 'Topic deleted successfully'
+        }, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def teacher_topic_content(request, topic_id):
+    """
+    Get all content (videos, quizzes, assignments) for a specific topic
+    """
+    if request.user.role != 'teacher':
+        return Response({
+            'success': False,
+            'message': 'Access denied. Teacher privileges required.'
+        }, status=status.HTTP_403_FORBIDDEN)
+    
+    try:
+        teacher = TeacherProfile.objects.get(user=request.user)
+        topic = Topic.objects.get(id=topic_id, course__teacher=teacher, is_active=True)
+    except TeacherProfile.DoesNotExist:
+        return Response({
+            'success': False,
+            'message': 'Teacher profile not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Topic.DoesNotExist:
+        return Response({
+            'success': False,
+            'message': 'Topic not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    
+    # Get all related content
+    videos = Video.objects.filter(topic=topic).order_by('order')
+    quizzes = Quiz.objects.filter(topic=topic).order_by('order')
+    assignments = Assignment.objects.filter(topic=topic).order_by('order')
+    
+    # Serialize the data
+    video_serializer = TeacherVideoSerializer(videos, many=True)
+    quiz_serializer = TeacherQuizSerializer(quizzes, many=True)
+    assignment_serializer = TeacherAssignmentSerializer(assignments, many=True)
+    topic_serializer = TeacherTopicSerializer(topic)
+    
+    return Response({
+        'success': True,
+        'data': {
+            'topic': topic_serializer.data,
+            'videos': video_serializer.data,
+            'quizzes': quiz_serializer.data,
+            'assignments': assignment_serializer.data,
+            'stats': {
+                'total_videos': videos.count(),
+                'total_quizzes': quizzes.count(),
+                'total_assignments': assignments.count(),
+                'total_duration': topic.get_total_duration()
+            }
+        }
+    }, status=status.HTTP_200_OK)
+
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+def teacher_topics_reorder(request, course_id):
+    """
+    Reorder topics for a course
+    Expected data: {'topic_orders': [{'id': 1, 'order': 1}, {'id': 2, 'order': 2}]}
+    """
+    if request.user.role != 'teacher':
+        return Response({
+            'success': False,
+            'message': 'Access denied. Teacher privileges required.'
+        }, status=status.HTTP_403_FORBIDDEN)
+    
+    try:
+        teacher = TeacherProfile.objects.get(user=request.user)
+        course = Course.objects.get(id=course_id, teacher=teacher)
+    except (TeacherProfile.DoesNotExist, Course.DoesNotExist):
+        return Response({
+            'success': False,
+            'message': 'Course or teacher profile not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    
+    topic_orders = request.data.get('topic_orders', [])
+    
+    if not topic_orders:
+        return Response({
+            'success': False,
+            'message': 'topic_orders data required'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        with transaction.atomic():
+            # First, reset all orders to very high temporary values
+            temp_base = 10000  # High enough to avoid conflicts
+            all_topics = Topic.objects.filter(course=course)
+            for topic in all_topics:
+                topic.order = temp_base + topic.id
+                topic.save()
+            
+            # Now set the new orders
+            for item in topic_orders:
+                topic = Topic.objects.get(id=item['id'], course=course)
+                topic.order = item['order']
+                topic.save()
+        
+        return Response({
+            'success': True,
+            'message': 'Topics reordered successfully'
+        }, status=status.HTTP_200_OK)
+    
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': f'Reorder failed: {str(e)}'
+        }, status=status.HTTP_400_BAD_REQUEST)
 
 
 # ====================================

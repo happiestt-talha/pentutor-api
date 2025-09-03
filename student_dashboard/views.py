@@ -80,7 +80,7 @@ def student_dashboard(request):
                 'enrolled_at': enrollment.enrolled_at,
                 'is_completed': enrollment.is_completed
             } for enrollment in recent_enrollments],
-            'available_courses': CourseListSerializer(available_courses, many=True).data
+            'available_courses': CourseListSerializer(available_courses, many=True, context={'request': request}).data
         }
     }, status=status.HTTP_200_OK)
 
@@ -166,8 +166,8 @@ def student_enrolled_courses(request):
             'course_id',
             openapi.IN_PATH,
             description="UUID of the course to enroll in",
-            type=openapi.TYPE_STRING,
-            format=openapi.FORMAT_UUID,
+            type=openapi.TYPE_INTEGER,
+           
             required=True
         )
     ]

@@ -23,7 +23,7 @@ urlpatterns = [
     path('dashboard/teacher/', views.TeacherDashboardView.as_view(), name='teacher_dashboard'),
     
     # Review URLs
-    path('jobs/<int:job_id>/review/', views.JobReviewCreateView.as_view(), name='job_review'),
+    path('jobs/<int:job_id>/review/', views.JobReviewCreateView.as_view(), name='job_review-create'),
     
     # Utility URLs
     path('jobs/<int:job_id>/schedule-meeting/', views.schedule_meeting_for_job, name='schedule_meeting'),

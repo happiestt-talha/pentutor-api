@@ -19,21 +19,21 @@ class SenderSerializer(serializers.ModelSerializer):
         return obj.get_full_name() or obj.username
 
 
-class CourseSerializer(serializers.ModelSerializer):
+class NotificationCourseSerializer(serializers.ModelSerializer):
     """Basic course serializer for notifications"""
     class Meta:
         model = Course
         fields = ['id', 'title', 'course_type']
 
 
-class VideoSerializer(serializers.ModelSerializer):
+class NotificationVideoSerializer(serializers.ModelSerializer):
     """Basic video serializer for notifications"""
     class Meta:
         model = Video
         fields = ['id', 'title', 'duration']
 
 
-class QuizSerializer(serializers.ModelSerializer):
+class NotificationQuizSerializer(serializers.ModelSerializer):
     """Basic quiz serializer for notifications"""
     class Meta:
         model = Quiz
@@ -52,9 +52,9 @@ class NotificationSerializer(serializers.ModelSerializer):
     Serializer for Notification model with nested related objects
     """
     sender = SenderSerializer(read_only=True)
-    course = CourseSerializer(read_only=True)
-    video = VideoSerializer(read_only=True)
-    quiz = QuizSerializer(read_only=True)
+    course = NotificationCourseSerializer(read_only=True)
+    video = NotificationVideoSerializer(read_only=True)
+    quiz = NotificationQuizSerializer(read_only=True)
     meeting = MeetingSerializer(read_only=True)
     time_since_created = serializers.ReadOnlyField()
     notification_type_display = serializers.CharField(

@@ -16,25 +16,42 @@ class CourseBasicSerializer(serializers.ModelSerializer):
 class StudentBasicSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='user.username', read_only=True)
     full_name = serializers.SerializerMethodField()
+    profile_picture = serializers.SerializerMethodField()
     
     class Meta:
         model = StudentProfile
-        fields = ['id', 'username', 'full_name']
+        fields = ['id', 'username', 'full_name','profile_picture']
     
     def get_full_name(self, obj):
         return f"{obj.user.first_name} {obj.user.last_name}".strip()
+    
+    def get_profile_picture(self, obj):
+        request = self.context.get('request')
+        if obj.profile_picture:
+            # Return absolute URL for frontend usage
+            return request.build_absolute_uri(obj.profile_picture.url) if request else obj.profile_picture.url
+        return None
+         
 
 
 class TeacherBasicSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='user.username', read_only=True)
     full_name = serializers.SerializerMethodField()
+    profile_picture = serializers.SerializerMethodField()
     
     class Meta:
         model = TeacherProfile
-        fields = ['id', 'username', 'full_name']
+        fields = ['id', 'username', 'full_name','profile_picture']
     
     def get_full_name(self, obj):
         return f"{obj.user.first_name} {obj.user.last_name}".strip()
+    
+    def get_profile_picture(self, obj):
+        request = self.context.get('request')
+        if obj.profile_picture:
+            # Return absolute URL for frontend usage
+            return request.build_absolute_uri(obj.profile_picture.url) if request else obj.profile_picture.url
+        return None
 
 
 class JobPostCreateSerializer(serializers.ModelSerializer):
@@ -47,11 +64,11 @@ class JobPostCreateSerializer(serializers.ModelSerializer):
         ]
     
     def validate(self, data):
-        # Ensure either course or subject_text is provided
-        if not data.get('course') and not data.get('subject_text'):
-            raise serializers.ValidationError(
-                "Either select a course or provide subject text."
-            )
+        # # Ensure either course or subject_text is provided
+        # if not data.get('course') and not data.get('subject_text'):
+        #     raise serializers.ValidationError(
+        #         "Either select a course or provide subject text."
+        #     )
         
         # Validate location for physical teaching
         if data.get('teaching_mode') == 'physical' and not data.get('location'):
@@ -70,9 +87,11 @@ class JobPostCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         # Set student from request user
         request = self.context.get('request')
-        if request and hasattr(request.user, 'studentprofile'):
-            validated_data['student'] = request.user.studentprofile
-        return super().create(validated_data)
+        print(hasattr(request.user, 'student_profile'))
+        if request and hasattr(request.user, 'student_profile'):
+            print(request.user.student_profile)
+            return JobPost.objects.create(student=request.user.student_profile, **validated_data)
+        raise serializers.ValidationError("Only students can create job posts.")
 
 
 class JobPostListSerializer(serializers.ModelSerializer):
@@ -101,8 +120,7 @@ class JobPostListSerializer(serializers.ModelSerializer):
             return f"{diff.seconds // 3600} hours ago"
         else:
             return f"{diff.seconds // 60} minutes ago"
-
-
+   
 class JobPostDetailSerializer(serializers.ModelSerializer):
     student = StudentBasicSerializer(read_only=True)
     course = CourseBasicSerializer(read_only=True)
@@ -125,13 +143,13 @@ class JobPostDetailSerializer(serializers.ModelSerializer):
     
     def get_is_owner(self, obj):
         request = self.context.get('request')
-        if request and hasattr(request.user, 'studentprofile'):
-            return obj.student == request.user.studentprofile
+        if request and hasattr(request.user, 'student_profile'):
+            return obj.student == request.user.student_profile
         return False
     
     def get_can_apply(self, obj):
         request = self.context.get('request')
-        if not request or not hasattr(request.user, 'teacherprofile'):
+        if not request or not hasattr(request.user, 'teacher_profile'):
             return False
         
         # Check if job is open and teacher hasn't applied yet
@@ -139,15 +157,15 @@ class JobPostDetailSerializer(serializers.ModelSerializer):
             return False
         
         return not obj.applications.filter(
-            teacher=request.user.teacherprofile
+            teacher=request.user.teacher_profile
         ).exists()
     
     def get_user_application(self, obj):
         request = self.context.get('request')
-        if request and hasattr(request.user, 'teacherprofile'):
+        if request and hasattr(request.user, 'teacher_profile'):
             try:
                 application = obj.applications.get(
-                    teacher=request.user.teacherprofile
+                    teacher=request.user.teacher_profile
                 )
                 return JobApplicationBasicSerializer(application).data
             except JobApplication.DoesNotExist:
@@ -170,8 +188,8 @@ class JobApplicationCreateSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         job_post = self.context.get('job_post')
         
-        if request and hasattr(request.user, 'teacherprofile'):
-            validated_data['teacher'] = request.user.teacherprofile
+        if request and hasattr(request.user, 'teacher_profile'):
+            validated_data['teacher'] = request.user.teacher_profile
         
         if job_post:
             validated_data['job_post'] = job_post

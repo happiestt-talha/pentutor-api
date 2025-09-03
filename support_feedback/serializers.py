@@ -45,7 +45,7 @@ class TeacherFeedbackSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = TeacherFeedback
-        fields = ['id', 'teacher_name', 'rating', 'feedback_text', 'user', 'created_at']
+        fields = ['id', 'teacher', 'rating', 'feedback_text', 'user', 'created_at']
         read_only_fields = ['user', 'created_at']
 
 class TicketReplyCreateSerializer(serializers.ModelSerializer):

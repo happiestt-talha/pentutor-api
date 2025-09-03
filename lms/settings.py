@@ -31,7 +31,16 @@ ALLOWED_HOSTS = [
     '*',
 ]
 
-CORS_ORIGIN_ALLOW_ALL = True
+CORS_ALLOWED_ORIGINS = [
+    'http://localhost:3000',
+    'http://localhost:8000',
+    'http://127.0.0.1:8000',
+    'https://pentutor.vercel.app',
+    'https://pentutor.com',
+]
+
+FRONTEND_URL = 'http://localhost:3000'
+# FRONTEND_URL = 'https://pentutor.com'
 
 AUTH_USER_MODEL = 'authentication.User'
 
@@ -63,7 +72,9 @@ INSTALLED_APPS = [
      'email_automation',
      'job_board',
      'support_feedback',
-     'drf_yasg'
+     'individual_live_class',
+     'drf_yasg',
+     'chate_box'
      
 ]
 
@@ -169,16 +180,14 @@ EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'mtalhamanzoor1930@gmail.com'
-EMAIL_HOST_PASSWORD = 'zkct ikal juvk guyc'
+EMAIL_HOST_USER = 'misbahyousaf00@gmail.com'
+EMAIL_HOST_PASSWORD = 'xiio vtop aqud hsaw'
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 # Email automation settings
 DEFAULT_FROM_EMAIL = 'noreply@lms.com'
 SITE_NAME = 'LMS Platform'
 SITE_URL = 'http://localhost:8000'
-FRONTEND_URL = 'https://pentutor.vercel.app'
-# FRONTEND_URL = 'http://localhost:3000'
 
 # Job Board specific settings
 JOB_BOARD_SETTINGS = {

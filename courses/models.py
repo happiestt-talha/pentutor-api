@@ -57,8 +57,43 @@ class Course(models.Model):
 
 
 
+# NEW MODEL: Topic
+class Topic(models.Model):
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='topics')
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(default=timezone.now)
+    is_active = models.BooleanField(default=True)
+    
+    class Meta:
+        ordering = ['order']
+        unique_together = ['course', 'order']
+    
+    def __str__(self):
+        return f"{self.course.title} - {self.title}"
+    
+    def get_total_videos(self):
+        return self.videos.count()
+    
+    def get_total_duration(self):
+        # Calculate total duration of all videos in this topic
+        videos = self.videos.all()
+        total_minutes = 0
+        for video in videos:
+            if video.duration:
+                # Assuming duration is in format "10:30"
+                try:
+                    minutes, seconds = map(int, video.duration.split(':'))
+                    total_minutes += minutes + (seconds / 60)
+                except:
+                    pass
+        return f"{int(total_minutes)}:{int((total_minutes % 1) * 60):02d}"
+
+
 class Video(models.Model):
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='videos')
+    topic = models.ForeignKey(Topic, on_delete=models.CASCADE, related_name='videos', null=True, blank=True)
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     video_file = models.FileField(upload_to='course_videos/')
@@ -75,6 +110,7 @@ class Video(models.Model):
 class Quiz(models.Model):
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='quizzes')
     video = models.ForeignKey(Video, on_delete=models.CASCADE, related_name='quizzes', null=True, blank=True)
+    topic = models.ForeignKey(Topic, on_delete=models.CASCADE, related_name='quizzes', null=True, blank=True)
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     passing_score = models.IntegerField(default=70)
@@ -97,6 +133,7 @@ class Question(models.Model):
 class Assignment(models.Model):
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='assignments')
     video = models.ForeignKey(Video, on_delete=models.CASCADE, related_name='assignments', null=True, blank=True)
+    topic = models.ForeignKey(Topic, on_delete=models.CASCADE, related_name='assignments', null=True, blank=True)
     title = models.CharField(max_length=200)
     description = models.TextField()
     due_date = models.DateTimeField(null=True, blank=True)

@@ -138,12 +138,7 @@ class Meeting(models.Model):
             # Check if user is enrolled in the course
           
             try:
-                # enrollment = Enrollment.objects.get(student=user, course=self.course,student__student_profile__isnull=False)
-                student_profile = getattr(user, "student_profile", None)
-                if not student_profile:
-                    return False, "User is not a student."
-                
-                enrollment = Enrollment.objects.get(student=student_profile,course=self.course,)
+                enrollment = Enrollment.objects.get(student=user, course=self.course,student__student_profile__isnull=False)
             except Enrollment.DoesNotExist:
                 return False, "You are not enrolled in this course"
             

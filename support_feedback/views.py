@@ -3,7 +3,6 @@ from rest_framework import generics, permissions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
-from django.core.exceptions import ValidationError
 from .models import SupportTicket, CourseFeedback, TeacherFeedback, TicketReply
 from .serializers import (
     SupportTicketSerializer, SupportTicketCreateSerializer,
@@ -36,18 +35,9 @@ class SupportTicketDetailView(generics.RetrieveAPIView):
     serializer_class = SupportTicketSerializer
     
     def get_queryset(self):
-        # Short-circuit for schema generation
-        if getattr(self, "swagger_fake_view", False):
+        if getattr(self, 'swagger_fake_view', False):
             return SupportTicket.objects.none()
-
-        user = getattr(self.request, "user", None)
-        if not user or not user.is_authenticated:
-            return SupportTicket.objects.none()
-
-        try:
-            return SupportTicket.objects.filter(user=user)
-        except ValidationError:
-            return SupportTicket.objects.none()
+        return SupportTicket.objects.filter(user=self.request.user)
 
 # Course Feedback Views
 class CourseFeedbackListCreateView(generics.ListCreateAPIView):

@@ -10,13 +10,18 @@ class IsStudentUser(permissions.BasePermission):
     """
     
     def has_permission(self, request, view):
+        print("Studnet is come: ",request.user.role)
+        print("Request: ",request.user.is_authenticated)
         if not request.user.is_authenticated:
             return False
+        print("ok")
         
-        return hasattr(request.user, 'studentprofile')
+        return getattr(request.user, "role", "").lower() == "student"
+    print("requuest")
     
     def has_object_permission(self, request, view, obj):
         # For job posts, check if user is the owner
+        print("oobject user: ",obj.student.user)
         if hasattr(obj, 'student'):
             return obj.student.user == request.user
         return False
@@ -31,7 +36,7 @@ class IsTeacherUser(permissions.BasePermission):
         if not request.user.is_authenticated:
             return False
         
-        return hasattr(request.user, 'teacherprofile')
+        return hasattr(request.user, 'teacher_profile')
     
     def has_object_permission(self, request, view, obj):
         # For job applications, check if user is the applicant
@@ -80,12 +85,12 @@ class IsApplicationOwnerOrJobOwner(permissions.BasePermission):
     
     def has_object_permission(self, request, view, obj):
         # Teacher who applied can read their application
-        if hasattr(obj, 'teacher') and hasattr(request.user, 'teacherprofile'):
+        if hasattr(obj, 'teacher') and hasattr(request.user, 'teacher_profile'):
             if obj.teacher.user == request.user:
                 return request.method in permissions.SAFE_METHODS
         
         # Student who owns the job can read/update applications
-        if hasattr(obj, 'job_post') and hasattr(request.user, 'studentprofile'):
+        if hasattr(obj, 'job_post') and hasattr(request.user, 'student_profile'):
             if obj.job_post.student.user == request.user:
                 return True
         
@@ -102,7 +107,7 @@ class CanApplyToJob(permissions.BasePermission):
             return False
         
         # Must be a teacher
-        if not hasattr(request.user, 'teacherprofile'):
+        if not hasattr(request.user, 'teacher_profile'):
             return False
         
         # Get job_post from view kwargs or context
@@ -121,7 +126,7 @@ class CanApplyToJob(permissions.BasePermission):
             # Teacher shouldn't have already applied
             if JobApplication.objects.filter(
                 job_post=job_post,
-                teacher=request.user.teacherprofile
+                teacher=request.user.teacher_profile
             ).exists():
                 return False
             
@@ -141,8 +146,8 @@ class IsStudentOrTeacher(permissions.BasePermission):
             return False
         
         return (
-            hasattr(request.user, 'studentprofile') or 
-            hasattr(request.user, 'teacherprofile')
+            hasattr(request.user, 'student_profile') or 
+            hasattr(request.user, 'teacher_profile')
         )
 
 
@@ -170,11 +175,11 @@ class CanReviewJob(permissions.BasePermission):
             
             # User must be either the student or the selected teacher
             user_is_student = (
-                hasattr(request.user, 'studentprofile') and
+                hasattr(request.user, 'student_profile') and
                 job_post.student.user == request.user
             )
             user_is_teacher = (
-                hasattr(request.user, 'teacherprofile') and
+                hasattr(request.user, 'teacher_profile') and
                 job_post.selected_teacher and
                 job_post.selected_teacher.user == request.user
             )
@@ -195,12 +200,12 @@ class IsJobParticipant(permissions.BasePermission):
         # For JobPost objects
         if hasattr(obj, 'student'):
             # Student owner
-            if hasattr(request.user, 'studentprofile'):
+            if hasattr(request.user, 'student_profile'):
                 if obj.student.user == request.user:
                     return True
             
             # Selected teacher
-            if hasattr(request.user, 'teacherprofile'):
+            if hasattr(request.user, 'teacher_profile'):
                 if obj.selected_teacher and obj.selected_teacher.user == request.user:
                     return True
         

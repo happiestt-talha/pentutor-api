@@ -66,13 +66,13 @@ class TeacherFeedback(models.Model):
     ]
     
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    teacher_name = models.CharField(max_length=200)  # Ya phir Teacher model ka FK
+    teacher = models.ForeignKey(TeacherProfile, on_delete=models.CASCADE, related_name='feedbacks')  
     rating = models.IntegerField(choices=RATING_CHOICES)
     feedback_text = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
     
     def __str__(self):
-        return f"{self.teacher_name} - {self.rating} stars"
+        return f"{self.teacher.full_name} - {self.rating} stars"
     
     class Meta:
         ordering = ['-created_at']

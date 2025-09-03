@@ -7,11 +7,10 @@ urlpatterns = [
     path('join/<str:meeting_id>/', views.join_meeting, name='join_meeting'),
     path('leave/<str:meeting_id>/', views.leave_meeting, name='leave_meeting'),
     path('end/<str:meeting_id>/', views.end_meeting, name='end_meeting'),
+    path('detail/<str:meeting_id>/', views.meting_detail, name='meeting_detail'),
     
     # Participants
     path('<str:meeting_id>/participants/', views.get_meeting_participants, name='meeting_participants'),
-
-    path('<str:meeting_id>/', views.get_meeting, name='get_meeting'),
     
     # Access Control & Invitations
     # path('<str:meeting_id>/invites/', views.send_invites, name='send_invites'),

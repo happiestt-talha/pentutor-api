@@ -85,19 +85,19 @@ def handle_demo_class_completion(sender, instance, created, **kwargs):
             )
 
 
-@receiver(post_save, sender=Video)
-def handle_new_video_added(sender, instance, created, **kwargs):
-    """
-    Send new content notification when a video is added to a course
-    """
-    if created:
-        logger.info(f"New video added to course: {instance.course.title} - {instance.title}")
+# @receiver(post_save, sender=Video)
+# def handle_new_video_added(sender, instance, created, **kwargs):
+#     """
+#     Send new content notification when a video is added to a course
+#     """
+#     if created:
+#         logger.info(f"New video added to course: {instance.course.title} - {instance.title}")
         
-        # Send notification to all enrolled students
-        send_new_content_notification.delay(
-            course_id=instance.course.id,
-            content_description=f"New video: {instance.title}"
-        )
+#         # Send notification to all enrolled students
+#         send_new_content_notification.delay(
+#             course_id=instance.course.id,
+#             content_description=f"New video: {instance.title}"
+#         )
 
 
 # You can add more signal handlers for other models like Quiz, Assignment, etc.

@@ -3,13 +3,14 @@
 from rest_framework import status, permissions, generics
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.db.models import Count, Q, Sum
 from django.shortcuts import get_object_or_404
 from django.db import models
 from notifications.models import Notification
-from authentication.models import User,TeacherProfile,StudentProfile
-from authentication.serializers import UserSerializer
+from authentication.models import User,TeacherProfile,StudentProfile, StudentQuery
+from authentication.serializers import UserSerializer,StudentQuerySerializer,StudentQueryListSerializer
 from courses.models import Course, Teacher, Enrollment
 from courses.serializers import CourseListSerializer
 from payments.models import Payment
@@ -83,7 +84,7 @@ def admin_dashboard_overview(request):
             },
             'recent_activity': {
                 'recent_users': UserSerializer(recent_users, many=True).data,
-                'recent_courses': CourseListSerializer(recent_courses, many=True).data,
+                'recent_courses': CourseListSerializer(recent_courses, many=True,context = {'request':request}).data,
                 'recent_payments': [
                     {
                         'id': payment.id,
@@ -368,7 +369,7 @@ def admin_teachers_courses(request):
                 'active_courses': courses.filter(is_active=True).count(),
                 'paid_courses': courses.filter(course_type='paid').count(),
                 'free_courses': courses.filter(course_type='free').count(),
-                'course_list': CourseListSerializer(courses, many=True).data
+                'course_list': CourseListSerializer(courses, many=True, context={'request': request}).data
             }
         }
         teachers_data.append(teacher_info)
@@ -785,3 +786,52 @@ class AdminTeacherFeedbackListView(generics.ListAPIView):
     )
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
+    
+
+
+class AdminStudentQueriesView(APIView):
+    """
+    Admin view to manage student queries
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        """Get all student queries"""
+        queries = StudentQuery.objects.all()
+        
+        # Filter options
+        status_filter = request.query_params.get('status')
+        if status_filter == 'pending':
+            queries = queries.filter(is_processed=False)
+        elif status_filter == 'processed':
+            queries = queries.filter(is_processed=True)
+        elif status_filter == 'registered':
+            queries = queries.filter(is_registered=True)
+        
+        serializer = StudentQueryListSerializer(queries, many=True)
+        return Response({
+            'success': True,
+            'data': serializer.data,
+            'count': queries.count()
+        })
+    
+    def patch(self, request, query_id):
+        """Update query status"""
+        try:
+            query = StudentQuery.objects.get(id=query_id)
+            query.is_processed = request.data.get('is_processed', query.is_processed)
+            query.admin_notes = request.data.get('admin_notes', query.admin_notes)
+            query.save()
+            
+            serializer = StudentQueryListSerializer(query)
+            return Response({
+                'success': True,
+                'message': 'Query updated successfully',
+                'data': serializer.data
+            })
+        except StudentQuery.DoesNotExist:
+            return Response({
+                'success': False,
+                'message': 'Query not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+

@@ -1,7 +1,7 @@
 # teacher_dashboard/serializers.py
 
 from rest_framework import serializers
-from courses.models import Course, Video, Quiz, Assignment, Enrollment , Question
+from courses.models import Course, Video, Quiz, Assignment, Enrollment , Question,Topic
 
 from meetings.models import Meeting
 
@@ -42,7 +42,7 @@ class TeacherVideoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Video
         fields = [
-            'id', 'title', 'description', 'video_file', 'duration', 
+            'id', 'title','topic', 'description', 'video_file', 'duration', 
             'order', 'created_at', 'has_quiz', 'has_assignment'
         ]
         read_only_fields = ['id', 'created_at', 'has_quiz', 'has_assignment']
@@ -67,7 +67,7 @@ class TeacherQuizSerializer(serializers.ModelSerializer):
     class Meta:
         model = Quiz
         fields = [
-            'id', 'title', 'description', 'passing_score', 'order', 'video', 'questions'
+            'id', 'title','topic', 'description', 'passing_score', 'order', 'video', 'questions'
         ]
         read_only_fields = ['id']
 
@@ -92,13 +92,6 @@ class EnrolledStudentSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'enrolled_at', 'course_title']
 
 
-class TeacherAssignmentSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Assignment
-        fields = [
-            'id', 'title', 'description', 'due_date', 'order', 'video'
-        ]
-        read_only_fields = ['id']
 
 
 class LiveClassSerializer(serializers.ModelSerializer):
@@ -119,3 +112,55 @@ class LiveClassSerializer(serializers.ModelSerializer):
     
     def get_can_join(self, obj):
         return obj.status in ['waiting', 'active']
+    
+
+
+
+class TeacherTopicSerializer(serializers.ModelSerializer):
+    total_videos = serializers.ReadOnlyField(source='get_total_videos')
+    total_duration = serializers.ReadOnlyField(source='get_total_duration')
+    course_title = serializers.ReadOnlyField(source='course.title')
+    
+    class Meta:
+        model = Topic
+        fields = [
+            'id', 
+            'title', 
+            'description', 
+            'order', 
+            'created_at', 
+            'is_active',
+            'total_videos',
+            'total_duration',
+            'course_title'
+        ]
+        read_only_fields = ['id', 'created_at', 'course_title']
+    
+    def validate_order(self, value):
+        """Ensure order is positive"""
+        if value < 0:
+            raise serializers.ValidationError("Order must be a positive number.")
+        return value
+    
+    def validate_title(self, value):
+        """Ensure title is not empty"""
+        if not value.strip():
+            raise serializers.ValidationError("Title cannot be empty.")
+        return value.strip()
+
+class TeacherAssignmentSerializer(serializers.ModelSerializer):
+    course_title = serializers.ReadOnlyField(source='course.title')
+    topic_title = serializers.ReadOnlyField(source='topic.title')
+    
+    class Meta:
+        model = Assignment
+        fields = [
+            'id', 
+            'title', 
+            'description', 
+            'due_date', 
+            'order',
+            'course_title',
+            'topic_title'
+        ]
+        read_only_fields = ['id', 'course_title', 'topic_title']

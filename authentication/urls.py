@@ -10,7 +10,8 @@ from .views import (
     ResendVerificationEmailView,
     ProfileUpdateView,
     CreateStudentProfileView,
-    CreateTeacherProfileView
+    CreateTeacherProfileView,
+    StudentQueryView
 )
 
 urlpatterns = [
@@ -25,6 +26,8 @@ urlpatterns = [
     path('admin/users/<uuid:user_id>/role/', AdminRoleUpdateView.as_view(), name='admin-role-update'),
 
     # request for teacher/studnet
-     path('student-profile/create/', CreateStudentProfileView.as_view(), name='create-student-profile'),
+    path('student-profile/create/', CreateStudentProfileView.as_view(), name='create-student-profile'),
     path('teacher-profile/create/', CreateTeacherProfileView.as_view(), name='create-teacher-profile'),
+
+    path('student-query/', StudentQueryView.as_view(), name='student-query'),
 ]

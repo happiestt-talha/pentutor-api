@@ -3,11 +3,10 @@
 from rest_framework import generics, status, filters
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated,AllowAny
 from django_filters.rest_framework import DjangoFilterBackend
 from django.shortcuts import get_object_or_404
 from django.db import transaction
-from django.http import Http404
 
 from .models import JobPost, JobApplication, JobReview
 from .serializers import (
@@ -34,7 +33,7 @@ class JobPostListView(generics.ListAPIView):
         'student__user', 'course', 'selected_teacher__user'
     ).prefetch_related('applications')
     serializer_class = JobPostListSerializer
-    permission_classes = [IsAuthenticated, IsStudentOrTeacher]
+    permission_classes = [AllowAny]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_class = JobPostFilter
     search_fields = ['title', 'description', 'subject_text', 'course__name']
@@ -48,7 +47,9 @@ class JobPostCreateView(generics.CreateAPIView):
     """
     queryset = JobPost.objects.all()
     serializer_class = JobPostCreateSerializer
+    print("ok")
     permission_classes = [IsAuthenticated, IsStudentUser]
+    print("studentUser")
 
     def create(self, request, *args, **kwargs):
         try:
@@ -74,7 +75,7 @@ class JobPostDetailView(generics.RetrieveUpdateAPIView):
         'student__user', 'course', 'selected_teacher__user'
     ).prefetch_related('applications__teacher__user')
     serializer_class = JobPostDetailSerializer
-    permission_classes = [IsAuthenticated, IsJobOwnerOrReadOnly]
+    permission_classes = [AllowAny]
 
     def get_serializer_class(self):
         if self.request.method in ['PUT', 'PATCH']:
@@ -107,19 +108,11 @@ class JobApplicationCreateView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated, CanApplyToJob]
 
     def get_serializer_context(self):
-        # Return a minimal safe context during schema generation
-        if getattr(self, "swagger_fake_view", False):
-            return {"request": None}
-
         context = super().get_serializer_context()
-
-        # safer access to kwargs to avoid KeyError during schema generation
-        job_id = self.kwargs.get('job_id')
-        if not job_id:
-            # If real request missing job_id, raise 404 (or handle as you prefer)
-            raise Http404("job_id missing")
-
-        job_post = get_object_or_404(JobPost, id=job_id)
+        # Short-circuit during schema generation
+        if getattr(self, 'swagger_fake_view', False):
+            return context
+        job_post = get_object_or_404(JobPost, id=self.kwargs['job_id'])
         context['job_post'] = job_post
         return context
 
@@ -139,13 +132,12 @@ class JobApplicationCreateView(generics.CreateAPIView):
             }, status=status.HTTP_400_BAD_REQUEST)
 
 
-
 class JobApplicationListView(generics.ListAPIView):
     """
     List applications for a specific job post. Only job owner can see this.
     """
     serializer_class = JobApplicationBasicSerializer
-    permission_classes = [IsAuthenticated, IsStudentUser]
+    permission_classes = [IsAuthenticated, IsStudentOrTeacher]
 
     def get_queryset(self):
         job_post = get_object_or_404(JobPost, id=self.kwargs['job_id'])
@@ -312,6 +304,9 @@ class JobReviewCreateView(generics.CreateAPIView):
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
+        # Short-circuit during schema generation
+        if getattr(self, 'swagger_fake_view', False):
+            return context
         job_post = get_object_or_404(JobPost, id=self.kwargs['job_id'])
         context['job_post'] = job_post
         return context

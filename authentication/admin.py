@@ -3,10 +3,11 @@ from django.contrib import admin
 # Register your models here.
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import User,TeacherProfile,StudentProfile
+from .models import User,TeacherProfile,StudentProfile,StudentQuery
 
 admin.site.register(TeacherProfile)
 admin.site.register(StudentProfile)
+admin.site.register(StudentQuery)
 
 @admin.register(User)
 class CustomUserAdmin(UserAdmin):

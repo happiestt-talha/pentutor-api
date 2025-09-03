@@ -230,3 +230,52 @@ class TeacherProfile(models.Model):
             models.Index(fields=['average_rating']),
              models.Index(fields=['status']),
         ]
+
+
+
+class StudentQuery(models.Model):
+    """
+    Student Query Form - for visitors who want to inquire before registration
+    """
+    # Basic Info
+    name = models.CharField(max_length=100)
+    email = models.EmailField()
+    contact_no = models.CharField(max_length=15)
+    area = models.CharField(max_length=100)
+    current_class = models.CharField(max_length=50, help_text="Current class/grade")
+    
+    # Academic Info
+    subjects = models.TextField(help_text="Subjects of interest (comma separated)")
+    special_requirements = models.TextField(blank=True, null=True, help_text="Any special requirements or requests")
+    
+    # Status
+    is_registered = models.BooleanField(default=False, help_text="Has this person registered as a student?")
+    is_processed = models.BooleanField(default=False, help_text="Has admin processed this query?")
+    admin_notes = models.TextField(blank=True, null=True, help_text="Admin notes for this query")
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    # Link to user if they register later
+    linked_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        help_text="User account if they registered later"
+    )
+
+    def __str__(self):
+        return f"Query by {self.name} - {self.email}"
+
+    class Meta:
+        db_table = 'student_queries'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['email']),
+            models.Index(fields=['is_registered']),
+            models.Index(fields=['is_processed']),
+            models.Index(fields=['created_at']),
+        ]
+
