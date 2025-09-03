@@ -25,6 +25,13 @@ from drf_yasg import openapi
 import json
 from rest_framework.parsers import MultiPartParser, FormParser
 
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
+
 class UserRegistrationView(APIView):
     permission_classes = [AllowAny]
     @swagger_auto_schema(
@@ -73,7 +80,7 @@ class UserRegistrationView(APIView):
         Your Role is {user.role}
         
         Please click the following link to verify your email:
-        http://localhost:8000/api/auth/verify-email/{token}/
+        {FRONTEND_URL}/auth/verify-email/{token}/
         
         If you didn't create this account, please ignore this email.
         
@@ -267,7 +274,7 @@ class ResendVerificationEmailView(APIView):
         Hi {user.username},
         
         Please click the following link to verify your email:
-        http://localhost:8000/api/auth/verify-email/{token}/
+        {FRONTEND_URL}/auth/verify-email/{token}/
         
         If you didn't request this, please ignore this email.
         

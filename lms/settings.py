@@ -36,11 +36,11 @@ CORS_ALLOWED_ORIGINS = [
     'http://localhost:8000',
     'http://127.0.0.1:8000',
     'https://pentutor.vercel.app',
+    'https://pen-tutor.vercel.app',
+    'https://pen-tutor-.vercel.app',
     'https://pentutor.com',
 ]
 
-FRONTEND_URL = 'http://localhost:3000'
-# FRONTEND_URL = 'https://pentutor.com'
 
 AUTH_USER_MODEL = 'authentication.User'
 
